@@ -31,9 +31,14 @@ app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Routes (will be added phase by phase)
-// const authRoutes = require("./routes/auth.routes");
-// app.use("/api/auth", authRoutes);
+// Routes
+const authRoutes = require("./routes/auth.routes");
+app.use("/api/auth", authRoutes);
+
+// Error handlers
+const { errorHandler, notFoundHandler } = require("./middleware/error.middleware");
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Socket events
 io.on("connection", (socket) => {

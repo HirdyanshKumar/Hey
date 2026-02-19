@@ -4,7 +4,8 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
-const { connectRedis } = require("./config/redis");
+
+const prisma = require("./config/prisma");
 
 dotenv.config();
 
@@ -28,8 +29,9 @@ app.use(cookieParser());
 
 // Health check
 app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.status(200).json('Server is running');
 });
+
 
 // Routes
 const authRoutes = require("./routes/auth.routes");
@@ -51,14 +53,8 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-const startServer = async () => {
-    await connectRedis();
-
-    server.listen(PORT, () => {
-        console.log(`Server running on http://localhost:${PORT}`);
-    });
-};
-
-startServer();
+server.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
 
 module.exports = { app, server, io };

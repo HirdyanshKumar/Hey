@@ -35,21 +35,18 @@ app.get("/api/health", (req, res) => {
 
 // Routes
 const authRoutes = require("./routes/auth.routes");
+const userRoutes = require("./routes/user.routes");
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 
 // Error handlers
 const { errorHandler, notFoundHandler } = require("./middleware/error.middleware");
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Socket events
-io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.id}`);
-
-    socket.on("disconnect", () => {
-        console.log(`User disconnected: ${socket.id}`);
-    });
-});
+// Socket.IO — presence tracking with JWT auth
+const { initializeSocket } = require("./socket/socket");
+initializeSocket(io);
 
 const PORT = process.env.PORT || 5000;
 

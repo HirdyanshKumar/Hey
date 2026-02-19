@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 import { Search, Settings, Plus, Hash, MessageCircle } from "lucide-react";
 
 // Demo data — will be replaced with real API data in Phase 5
@@ -15,15 +18,18 @@ const DEMO_CHANNELS = [
 
 const Sidebar = ({ selectedChat, onSelectChat }) => {
     const [searchQuery, setSearchQuery] = useState("");
+    const { user } = useAuth();
+    const { isConnected } = useSocket();
+    const navigate = useNavigate();
 
     // Generate initials from name
-    const getInitials = (name) => name.split(" ").map((n) => n[0]).join("").toUpperCase();
+    const getInitials = (name) => name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "?";
 
     // Random avatar color based on name
     const getAvatarColor = (name) => {
         const colors = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#14b8a6"];
         let hash = 0;
-        for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        for (let i = 0; i < (name?.length || 0); i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
         return colors[Math.abs(hash) % colors.length];
     };
 
@@ -51,8 +57,10 @@ const Sidebar = ({ selectedChat, onSelectChat }) => {
                 <button
                     className="p-2 rounded-lg transition-fast"
                     style={{ color: "var(--text-secondary)" }}
-                    onMouseEnter={(e) => (e.target.style.backgroundColor = "var(--bg-hover)")}
-                    onMouseLeave={(e) => (e.target.style.backgroundColor = "transparent")}
+                    onClick={() => navigate("/profile")}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                    title="Profile & Settings"
                 >
                     <Settings size={18} />
                 </button>
@@ -185,24 +193,40 @@ const Sidebar = ({ selectedChat, onSelectChat }) => {
 
             {/* ── Current User Footer ────────────────────── */}
             <div
-                className="flex items-center gap-3 px-4 py-3 border-t"
+                className="flex items-center gap-3 px-4 py-3 border-t cursor-pointer"
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-secondary)" }}
+                onClick={() => navigate("/profile")}
             >
                 <div className="relative">
-                    <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                        style={{ backgroundColor: "#f59e0b" }}
-                    >
-                        M
-                    </div>
+                    {user?.avatarUrl ? (
+                        <img
+                            src={user.avatarUrl}
+                            alt={user.displayName}
+                            className="w-9 h-9 rounded-full object-cover"
+                        />
+                    ) : (
+                        <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                            style={{ backgroundColor: getAvatarColor(user?.displayName) }}
+                        >
+                            {getInitials(user?.displayName)}
+                        </div>
+                    )}
                     <div
                         className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
-                        style={{ backgroundColor: "var(--online)", borderColor: "var(--bg-secondary)" }}
+                        style={{
+                            backgroundColor: isConnected ? "var(--online)" : "var(--text-muted)",
+                            borderColor: "var(--bg-secondary)",
+                        }}
                     />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Marcus Dev</p>
-                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Online</p>
+                    <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {user?.displayName || "User"}
+                    </p>
+                    <p className="text-xs" style={{ color: isConnected ? "var(--online)" : "var(--text-secondary)" }}>
+                        {isConnected ? "Online" : "Offline"}
+                    </p>
                 </div>
                 <MessageCircle size={16} style={{ color: "var(--text-muted)" }} />
             </div>

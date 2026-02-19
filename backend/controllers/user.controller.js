@@ -1,0 +1,122 @@
+const prisma = require("../config/prisma");
+const cloudinary = require("../config/cloudinary");
+
+// GET /api/users/profile/:userId
+const getProfile = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                bio: true,
+                isOnline: true,
+                lastSeen: true,
+                createdAt: true,
+            },
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        res.json({ user });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// PUT /api/users/profile
+const updateProfile = async (req, res, next) => {
+    try {
+        const { displayName, bio } = req.body;
+
+        // Build update data — only include fields that were sent
+        const updateData = {};
+
+        if (displayName !== undefined) {
+            if (displayName.trim().length < 2) {
+                return res.status(400).json({ error: "Display name must be at least 2 characters." });
+            }
+            updateData.displayName = displayName.trim();
+        }
+
+        if (bio !== undefined) {
+            if (bio.length > 200) {
+                return res.status(400).json({ error: "Bio must be 200 characters or less." });
+            }
+            updateData.bio = bio.trim();
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ error: "No fields to update." });
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: req.user.id },
+            data: updateData,
+            select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                bio: true,
+                isOnline: true,
+                lastSeen: true,
+                createdAt: true,
+            },
+        });
+
+        res.json({ message: "Profile updated successfully.", user: updatedUser });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// PUT /api/users/avatar
+const updateAvatar = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No image file provided." });
+        }
+
+        // Convert buffer to base64 data URI for Cloudinary upload
+        const b64 = Buffer.from(req.file.buffer).toString("base64");
+        const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+
+        // Upload to Cloudinary
+        const result = await cloudinary.uploader.upload(dataURI, {
+            folder: "hey_avatars",
+            transformation: [
+                { width: 300, height: 300, crop: "fill", gravity: "face" },
+                { quality: "auto", fetch_format: "auto" },
+            ],
+        });
+
+        // Update user avatar URL in DB
+        const updatedUser = await prisma.user.update({
+            where: { id: req.user.id },
+            data: { avatarUrl: result.secure_url },
+            select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                bio: true,
+                isOnline: true,
+                lastSeen: true,
+                createdAt: true,
+            },
+        });
+
+        res.json({ message: "Avatar updated successfully.", user: updatedUser });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { getProfile, updateProfile, updateAvatar };

@@ -544,3 +544,121 @@ a:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+
+/* ── Chat Window ────────────────────────────────────── */
+.chat-messages-area {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+
+/* Message Bubbles */
+.chat-bubble {
+  max-width: 65%;
+  padding: 0.6rem 0.9rem;
+  border-radius: 16px;
+  position: relative;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.chat-bubble-sent {
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-bubble-received {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.chat-bubble-time {
+  display: block;
+  font-size: 0.625rem;
+  margin-top: 4px;
+  text-align: right;
+  opacity: 0.6;
+}
+
+.chat-bubble-sent .chat-bubble-time {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.chat-bubble-received .chat-bubble-time {
+  color: var(--text-muted);
+}
+
+/* Back button (visible on small screens) */
+.chat-back-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .chat-back-btn {
+    display: flex;
+  }
+}
+
+/* ── New Chat Modal ─────────────────────────────────── */
+.new-chat-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  animation: modalFadeIn 0.2s ease;
+}
+
+.new-chat-modal {
+  width: 90%;
+  max-width: 420px;
+  max-height: 500px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  animation: modalSlideIn 0.25s ease;
+}
+
+.new-chat-results {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Loading Spinner ────────────────────────────────── */
+.chat-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}

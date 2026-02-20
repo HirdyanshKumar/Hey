@@ -1,6 +1,6 @@
 const express = require("express");
 const multer = require("multer");
-const { getProfile, updateProfile, updateAvatar } = require("../controllers/user.controller");
+const { getProfile, updateProfile, updateAvatar, searchUsers } = require("../controllers/user.controller");
 const { authMiddleware } = require("../middleware/auth.middleware");
 
 const router = express.Router();
@@ -21,6 +21,9 @@ const upload = multer({
 
 // All routes require authentication
 router.use(authMiddleware);
+
+// Search users
+router.get("/search", searchUsers);
 
 // Profile routes
 router.get("/profile/:userId", getProfile);

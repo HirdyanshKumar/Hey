@@ -119,4 +119,41 @@ const updateAvatar = async (req, res, next) => {
     }
 };
 
-module.exports = { getProfile, updateProfile, updateAvatar };
+// GET /api/users/search?q=...
+const searchUsers = async (req, res, next) => {
+    try {
+        const { q } = req.query;
+
+        if (!q || q.trim().length < 1) {
+            return res.json({ users: [] });
+        }
+
+        const users = await prisma.user.findMany({
+            where: {
+                AND: [
+                    { id: { not: req.user.id } },
+                    {
+                        OR: [
+                            { displayName: { contains: q.trim(), mode: "insensitive" } },
+                            { email: { contains: q.trim(), mode: "insensitive" } },
+                        ],
+                    },
+                ],
+            },
+            select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                isOnline: true,
+            },
+            take: 20,
+        });
+
+        res.json({ users });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { getProfile, updateProfile, updateAvatar, searchUsers };

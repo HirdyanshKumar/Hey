@@ -36,8 +36,10 @@ app.get("/api/health", (req, res) => {
 // Routes
 const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/user.routes");
+const conversationRoutes = require("./routes/conversation.routes");
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 // Error handlers
 const { errorHandler, notFoundHandler } = require("./middleware/error.middleware");

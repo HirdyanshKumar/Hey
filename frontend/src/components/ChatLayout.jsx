@@ -1,22 +1,37 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 import WelcomeScreen from "./WelcomeScreen";
+import ChatWindow from "./ChatWindow";
 import { SocketProvider } from "../context/SocketContext";
+import { ChatProvider } from "../context/ChatContext";
+import { useChat } from "../context/ChatContext";
 
-const ChatLayout = () => {
-    const [selectedChat, setSelectedChat] = useState(null);
+const ChatContent = () => {
+    const { selectedConversation, selectConversation } = useChat();
 
     return (
-        <SocketProvider>
-            <div className="flex h-screen w-screen overflow-hidden" style={{ backgroundColor: "var(--bg-primary)" }}>
-                {/* Sidebar */}
-                <Sidebar selectedChat={selectedChat} onSelectChat={setSelectedChat} />
+        <div className="flex h-screen w-screen overflow-hidden" style={{ backgroundColor: "var(--bg-primary)" }}>
+            {/* Sidebar */}
+            <Sidebar />
 
-                {/* Main Chat Area */}
-                <main className="flex-1 flex flex-col min-w-0">
+            {/* Main Chat Area */}
+            <main className="flex-1 flex flex-col min-w-0">
+                {selectedConversation ? (
+                    <ChatWindow onBack={() => selectConversation(null)} />
+                ) : (
                     <WelcomeScreen />
-                </main>
-            </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
+const ChatLayout = () => {
+    return (
+        <SocketProvider>
+            <ChatProvider>
+                <ChatContent />
+            </ChatProvider>
         </SocketProvider>
     );
 };

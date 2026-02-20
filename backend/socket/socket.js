@@ -55,6 +55,91 @@ const initializeSocket = (io) => {
         // Send the list of currently online users to the newly connected client
         socket.emit("users:online", getOnlineUserIds());
 
+        // ── Auto-join conversation rooms ──────────────────
+        try {
+            const participations = await prisma.conversationParticipant.findMany({
+                where: { userId },
+                select: { conversationId: true },
+            });
+
+            for (const p of participations) {
+                socket.join(`conv:${p.conversationId}`);
+            }
+            console.log(`📦 User ${userId} joined ${participations.length} conversation rooms`);
+        } catch (err) {
+            console.error("Failed to auto-join conversation rooms:", err.message);
+        }
+
+        // ── Join a specific conversation room ─────────────
+        socket.on("join:conversation", async ({ conversationId }) => {
+            try {
+                // Verify user is a participant
+                const participant = await prisma.conversationParticipant.findFirst({
+                    where: { conversationId, userId },
+                });
+
+                if (!participant) {
+                    return socket.emit("error", { message: "Not a participant of this conversation." });
+                }
+
+                socket.join(`conv:${conversationId}`);
+                console.log(`📥 User ${userId} joined room conv:${conversationId}`);
+            } catch (err) {
+                console.error("join:conversation error:", err.message);
+            }
+        });
+
+        // ── Leave a conversation room ─────────────────────
+        socket.on("leave:conversation", ({ conversationId }) => {
+            socket.leave(`conv:${conversationId}`);
+            console.log(`📤 User ${userId} left room conv:${conversationId}`);
+        });
+
+        // ── Send a message ────────────────────────────────
+        socket.on("send:message", async ({ conversationId, content }) => {
+            try {
+                if (!content?.trim()) return;
+
+                // Verify user is a participant
+                const participant = await prisma.conversationParticipant.findFirst({
+                    where: { conversationId, userId },
+                });
+
+                if (!participant) {
+                    return socket.emit("error", { message: "Not a participant of this conversation." });
+                }
+
+                // Persist message to DB
+                const message = await prisma.message.create({
+                    data: {
+                        conversationId,
+                        senderId: userId,
+                        content: content.trim(),
+                    },
+                    include: {
+                        sender: { select: { id: true, displayName: true, avatarUrl: true } },
+                    },
+                });
+
+                // Update conversation's updatedAt timestamp
+                await prisma.conversation.update({
+                    where: { id: conversationId },
+                    data: { updatedAt: new Date() },
+                });
+
+                // Broadcast message to all users in the conversation room
+                io.to(`conv:${conversationId}`).emit("new:message", {
+                    conversationId,
+                    message,
+                });
+
+                console.log(`💬 Message from ${userId} in conv:${conversationId}`);
+            } catch (err) {
+                console.error("send:message error:", err.message);
+                socket.emit("error", { message: "Failed to send message." });
+            }
+        });
+
         // ── Disconnect ────────────────────────────────────
         socket.on("disconnect", async () => {
             console.log(`❌ User disconnected: ${userId} (socket: ${socket.id})`);

@@ -95,6 +95,21 @@ const initializeSocket = (io) => {
             console.log(`📤 User ${userId} left room conv:${conversationId}`);
         });
 
+        // ── Typing indicators ─────────────────────────────
+        socket.on("typing:start", ({ conversationId }) => {
+            socket.to(`conv:${conversationId}`).emit("typing:start", {
+                conversationId,
+                userId,
+            });
+        });
+
+        socket.on("typing:stop", ({ conversationId }) => {
+            socket.to(`conv:${conversationId}`).emit("typing:stop", {
+                conversationId,
+                userId,
+            });
+        });
+
         // ── Send a message ────────────────────────────────
         socket.on("send:message", async ({ conversationId, content }) => {
             try {
@@ -107,6 +122,28 @@ const initializeSocket = (io) => {
 
                 if (!participant) {
                     return socket.emit("error", { message: "Not a participant of this conversation." });
+                }
+
+                // Get other participants to check block status
+                const otherParticipants = await prisma.conversationParticipant.findMany({
+                    where: { conversationId, userId: { not: userId } },
+                    select: { userId: true },
+                });
+
+                // Check if sender is blocked by any other participant
+                for (const other of otherParticipants) {
+                    const blocked = await prisma.blockedUser.findFirst({
+                        where: {
+                            OR: [
+                                { blockerId: other.userId, blockedId: userId },
+                                { blockerId: userId, blockedId: other.userId },
+                            ],
+                        },
+                    });
+
+                    if (blocked) {
+                        return socket.emit("error", { message: "Cannot send messages. User has been blocked." });
+                    }
                 }
 
                 // Persist message to DB
@@ -131,6 +168,12 @@ const initializeSocket = (io) => {
                 io.to(`conv:${conversationId}`).emit("new:message", {
                     conversationId,
                     message,
+                });
+
+                // Auto-stop typing for this user
+                socket.to(`conv:${conversationId}`).emit("typing:stop", {
+                    conversationId,
+                    userId,
                 });
 
                 console.log(`💬 Message from ${userId} in conv:${conversationId}`);

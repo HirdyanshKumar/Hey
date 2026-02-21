@@ -1,6 +1,6 @@
 const express = require("express");
 const multer = require("multer");
-const { getProfile, updateProfile, updateAvatar, searchUsers } = require("../controllers/user.controller");
+const { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers } = require("../controllers/user.controller");
 const { authMiddleware } = require("../middleware/auth.middleware");
 
 const router = express.Router();
@@ -24,6 +24,11 @@ router.use(authMiddleware);
 
 // Search users
 router.get("/search", searchUsers);
+
+// Block management
+router.get("/blocked", getBlockedUsers);
+router.post("/block/:userId", blockUser);
+router.delete("/block/:userId", unblockUser);
 
 // Profile routes
 router.get("/profile/:userId", getProfile);

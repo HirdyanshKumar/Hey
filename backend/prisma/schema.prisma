@@ -24,7 +24,23 @@ model User {
   participants ConversationParticipant[]
   messages     Message[]
 
+  blockedUsers   BlockedUser[] @relation("blocker")
+  blockedByUsers BlockedUser[] @relation("blocked")
+
   @@map("users")
+}
+
+model BlockedUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker   User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@map("blocked_users")
 }
 
 model Conversation {

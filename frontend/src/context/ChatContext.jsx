@@ -21,7 +21,10 @@ export const ChatProvider = ({ children }) => {
     const [messages, setMessages] = useState([]);
     const [loadingConversations, setLoadingConversations] = useState(true);
     const [loadingMessages, setLoadingMessages] = useState(false);
+    const [typingUsers, setTypingUsers] = useState({}); // { conversationId: Set<userId> }
     const selectedConvIdRef = useRef(null);
+    const typingTimeoutRef = useRef(null);
+    const isTypingRef = useRef(false);
 
     // Fetch all conversations
     const fetchConversations = useCallback(async () => {
@@ -99,14 +102,88 @@ export const ChatProvider = ({ children }) => {
             conversationId: selectedConvIdRef.current,
             content,
         });
+
+        // Stop typing when sending
+        stopTyping();
     }, [socket, isConnected]);
+
+    // Typing indicators
+    const startTyping = useCallback(() => {
+        if (!socket || !isConnected || !selectedConvIdRef.current || isTypingRef.current) return;
+
+        isTypingRef.current = true;
+        socket.emit("typing:start", { conversationId: selectedConvIdRef.current });
+
+        // Auto-stop typing after 3 seconds of no new typing events
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            stopTyping();
+        }, 3000);
+    }, [socket, isConnected]);
+
+    const stopTyping = useCallback(() => {
+        if (!socket || !isConnected || !selectedConvIdRef.current) return;
+
+        if (isTypingRef.current) {
+            isTypingRef.current = false;
+            socket.emit("typing:stop", { conversationId: selectedConvIdRef.current });
+        }
+
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+    }, [socket, isConnected]);
+
+    const resetTypingTimeout = useCallback(() => {
+        if (!isTypingRef.current) {
+            startTyping();
+            return;
+        }
+
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            stopTyping();
+        }, 3000);
+    }, [startTyping, stopTyping]);
+
+    // Block / Unblock
+    const blockUser = useCallback(async (targetUserId) => {
+        try {
+            await api.post(`/users/block/${targetUserId}`);
+            return true;
+        } catch (error) {
+            console.error("Failed to block user:", error);
+            return false;
+        }
+    }, []);
+
+    const unblockUser = useCallback(async (targetUserId) => {
+        try {
+            await api.delete(`/users/block/${targetUserId}`);
+            return true;
+        } catch (error) {
+            console.error("Failed to unblock user:", error);
+            return false;
+        }
+    }, []);
+
+    // Check block status for a conversation
+    const checkBlockStatus = useCallback(async (targetUserId) => {
+        try {
+            const { data } = await api.get("/users/blocked");
+            return data.users.some((u) => u.id === targetUserId);
+        } catch (error) {
+            return false;
+        }
+    }, []);
 
     // Fetch conversations on mount
     useEffect(() => {
         fetchConversations();
     }, [fetchConversations]);
 
-    // Listen for new messages
+    // Listen for new messages & typing events
     useEffect(() => {
         if (!socket) return;
 
@@ -137,9 +214,50 @@ export const ChatProvider = ({ children }) => {
             });
         };
 
+        const handleTypingStart = ({ conversationId, userId: typingUserId }) => {
+            if (typingUserId === user?.id) return; // Ignore own typing
+            setTypingUsers((prev) => {
+                const newState = { ...prev };
+                if (!newState[conversationId]) {
+                    newState[conversationId] = new Set();
+                } else {
+                    newState[conversationId] = new Set(newState[conversationId]);
+                }
+                newState[conversationId].add(typingUserId);
+                return newState;
+            });
+        };
+
+        const handleTypingStop = ({ conversationId, userId: typingUserId }) => {
+            if (typingUserId === user?.id) return;
+            setTypingUsers((prev) => {
+                const newState = { ...prev };
+                if (newState[conversationId]) {
+                    const newSet = new Set(newState[conversationId]);
+                    newSet.delete(typingUserId);
+                    newState[conversationId] = newSet;
+                }
+                return newState;
+            });
+        };
+
         socket.on("new:message", handleNewMessage);
-        return () => socket.off("new:message", handleNewMessage);
-    }, [socket]);
+        socket.on("typing:start", handleTypingStart);
+        socket.on("typing:stop", handleTypingStop);
+
+        return () => {
+            socket.off("new:message", handleNewMessage);
+            socket.off("typing:start", handleTypingStart);
+            socket.off("typing:stop", handleTypingStop);
+        };
+    }, [socket, user?.id]);
+
+    // Get typing users for the current conversation
+    const getTypingUsers = useCallback((conversationId) => {
+        const typingSet = typingUsers[conversationId];
+        if (!typingSet || typingSet.size === 0) return [];
+        return Array.from(typingSet);
+    }, [typingUsers]);
 
     return (
         <ChatContext.Provider
@@ -153,6 +271,13 @@ export const ChatProvider = ({ children }) => {
                 createConversation,
                 sendMessage,
                 fetchConversations,
+                startTyping,
+                stopTyping,
+                resetTypingTimeout,
+                getTypingUsers,
+                blockUser,
+                unblockUser,
+                checkBlockStatus,
             }}
         >
             {children}

@@ -156,4 +156,83 @@ const searchUsers = async (req, res, next) => {
     }
 };
 
-module.exports = { getProfile, updateProfile, updateAvatar, searchUsers };
+// POST /api/users/block/:userId — Block a user
+const blockUser = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const blockerId = req.user.id;
+
+        if (userId === blockerId) {
+            return res.status(400).json({ error: "Cannot block yourself." });
+        }
+
+        // Check if target user exists
+        const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+        if (!targetUser) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        // Check if already blocked
+        const existing = await prisma.blockedUser.findUnique({
+            where: { blockerId_blockedId: { blockerId, blockedId: userId } },
+        });
+
+        if (existing) {
+            return res.status(400).json({ error: "User already blocked." });
+        }
+
+        await prisma.blockedUser.create({
+            data: { blockerId, blockedId: userId },
+        });
+
+        res.json({ message: "User blocked successfully." });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// DELETE /api/users/block/:userId — Unblock a user
+const unblockUser = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const blockerId = req.user.id;
+
+        const existing = await prisma.blockedUser.findUnique({
+            where: { blockerId_blockedId: { blockerId, blockedId: userId } },
+        });
+
+        if (!existing) {
+            return res.status(404).json({ error: "User is not blocked." });
+        }
+
+        await prisma.blockedUser.delete({
+            where: { id: existing.id },
+        });
+
+        res.json({ message: "User unblocked successfully." });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// GET /api/users/blocked — Get list of blocked users
+const getBlockedUsers = async (req, res, next) => {
+    try {
+        const blocked = await prisma.blockedUser.findMany({
+            where: { blockerId: req.user.id },
+            include: {
+                blocked: {
+                    select: { id: true, displayName: true, avatarUrl: true, email: true },
+                },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+
+        const users = blocked.map((b) => b.blocked);
+        res.json({ users });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers };

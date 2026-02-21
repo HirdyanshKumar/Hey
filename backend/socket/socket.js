@@ -70,6 +70,59 @@ const initializeSocket = (io) => {
             console.error("Failed to auto-join conversation rooms:", err.message);
         }
 
+        // ── Auto-deliver undelivered messages on connect ──
+        try {
+            const participations = await prisma.conversationParticipant.findMany({
+                where: { userId },
+                select: { conversationId: true },
+            });
+
+            const conversationIds = participations.map((p) => p.conversationId);
+
+            if (conversationIds.length > 0) {
+                // Find all "sent" messages in user's conversations that weren't sent by this user
+                const undeliveredMessages = await prisma.message.findMany({
+                    where: {
+                        conversationId: { in: conversationIds },
+                        senderId: { not: userId },
+                        status: "sent",
+                    },
+                    select: { id: true, conversationId: true, senderId: true },
+                });
+
+                if (undeliveredMessages.length > 0) {
+                    const messageIds = undeliveredMessages.map((m) => m.id);
+
+                    // Bulk update to delivered
+                    await prisma.message.updateMany({
+                        where: { id: { in: messageIds } },
+                        data: { status: "delivered" },
+                    });
+
+                    // Group by conversation and notify senders
+                    const byConversation = {};
+                    for (const msg of undeliveredMessages) {
+                        if (!byConversation[msg.conversationId]) {
+                            byConversation[msg.conversationId] = [];
+                        }
+                        byConversation[msg.conversationId].push(msg.id);
+                    }
+
+                    for (const [convId, msgIds] of Object.entries(byConversation)) {
+                        io.to(`conv:${convId}`).emit("message:statusUpdate", {
+                            conversationId: convId,
+                            messageIds: msgIds,
+                            status: "delivered",
+                        });
+                    }
+
+                    console.log(`📬 Auto-delivered ${undeliveredMessages.length} messages for user ${userId}`);
+                }
+            }
+        } catch (err) {
+            console.error("Failed to auto-deliver messages:", err.message);
+        }
+
         // ── Join a specific conversation room ─────────────
         socket.on("join:conversation", async ({ conversationId }) => {
             try {
@@ -93,6 +146,18 @@ const initializeSocket = (io) => {
         socket.on("leave:conversation", ({ conversationId }) => {
             socket.leave(`conv:${conversationId}`);
             console.log(`📤 User ${userId} left room conv:${conversationId}`);
+        });
+
+        // ── Group: join room when added as member ─────────
+        socket.on("group:joinRoom", ({ conversationId }) => {
+            socket.join(`conv:${conversationId}`);
+            console.log(`👥 User ${userId} joined group room conv:${conversationId}`);
+        });
+
+        // ── Group: leave room when removed ────────────────
+        socket.on("group:leaveRoom", ({ conversationId }) => {
+            socket.leave(`conv:${conversationId}`);
+            console.log(`👥 User ${userId} left group room conv:${conversationId}`);
         });
 
         // ── Typing indicators ─────────────────────────────
@@ -146,12 +211,33 @@ const initializeSocket = (io) => {
                     }
                 }
 
+                // Check if any recipient is currently in the conversation room
+                const room = io.sockets.adapter.rooms.get(`conv:${conversationId}`);
+                let anyRecipientInRoom = false;
+                if (room) {
+                    for (const other of otherParticipants) {
+                        const otherSockets = onlineUsers.get(other.userId);
+                        if (otherSockets) {
+                            for (const sid of otherSockets) {
+                                if (room.has(sid)) {
+                                    anyRecipientInRoom = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (anyRecipientInRoom) break;
+                    }
+                }
+
+                const initialStatus = anyRecipientInRoom ? "delivered" : "sent";
+
                 // Persist message to DB
                 const message = await prisma.message.create({
                     data: {
                         conversationId,
                         senderId: userId,
                         content: content.trim(),
+                        status: initialStatus,
                     },
                     include: {
                         sender: { select: { id: true, displayName: true, avatarUrl: true } },
@@ -176,10 +262,97 @@ const initializeSocket = (io) => {
                     userId,
                 });
 
-                console.log(`💬 Message from ${userId} in conv:${conversationId}`);
+                console.log(`💬 Message from ${userId} in conv:${conversationId} [${initialStatus}]`);
             } catch (err) {
                 console.error("send:message error:", err.message);
                 socket.emit("error", { message: "Failed to send message." });
+            }
+        });
+
+        // ── Mark messages as delivered ─────────────────────
+        socket.on("message:delivered", async ({ messageIds, conversationId }) => {
+            try {
+                if (!messageIds?.length || !conversationId) return;
+
+                // Verify participant
+                const participant = await prisma.conversationParticipant.findFirst({
+                    where: { conversationId, userId },
+                });
+                if (!participant) return;
+
+                // Only update messages that are currently "sent" and not sent by this user
+                await prisma.message.updateMany({
+                    where: {
+                        id: { in: messageIds },
+                        conversationId,
+                        senderId: { not: userId },
+                        status: "sent",
+                    },
+                    data: { status: "delivered" },
+                });
+
+                // Broadcast status update to conversation
+                io.to(`conv:${conversationId}`).emit("message:statusUpdate", {
+                    conversationId,
+                    messageIds,
+                    status: "delivered",
+                });
+            } catch (err) {
+                console.error("message:delivered error:", err.message);
+            }
+        });
+
+        // ── Mark messages as read ──────────────────────────
+        socket.on("message:read", async ({ conversationId }) => {
+            try {
+                if (!conversationId) return;
+
+                // Verify participant
+                const participant = await prisma.conversationParticipant.findFirst({
+                    where: { conversationId, userId },
+                });
+                if (!participant) return;
+
+                // Find all unread messages (sent by others) in this conversation
+                const unreadMessages = await prisma.message.findMany({
+                    where: {
+                        conversationId,
+                        senderId: { not: userId },
+                        status: { not: "read" },
+                    },
+                    select: { id: true, senderId: true },
+                });
+
+                if (unreadMessages.length === 0) return;
+
+                const messageIds = unreadMessages.map((m) => m.id);
+                const now = new Date();
+
+                // Update all to read
+                await prisma.message.updateMany({
+                    where: { id: { in: messageIds } },
+                    data: { status: "read", readAt: now },
+                });
+
+                // Check if the current user has read receipts enabled
+                const currentUser = await prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { readReceiptsEnabled: true },
+                });
+
+                // Only broadcast read status if the reader has read receipts enabled
+                if (currentUser?.readReceiptsEnabled) {
+                    io.to(`conv:${conversationId}`).emit("message:statusUpdate", {
+                        conversationId,
+                        messageIds,
+                        status: "read",
+                        readAt: now.toISOString(),
+                    });
+                }
+
+                console.log(`👁️ ${unreadMessages.length} messages read by ${userId} in conv:${conversationId}`);
+            } catch (err) {
+                console.error("message:read error:", err.message);
             }
         });
 

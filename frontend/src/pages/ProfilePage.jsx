@@ -14,6 +14,7 @@ import {
     Mail,
     Calendar,
     Loader2,
+    Eye,
 } from "lucide-react";
 
 const ProfilePage = () => {
@@ -27,6 +28,8 @@ const ProfilePage = () => {
     const [bio, setBio] = useState(user?.bio || "");
     const [saving, setSaving] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [readReceipts, setReadReceipts] = useState(user?.readReceiptsEnabled !== false);
+    const [togglingReceipts, setTogglingReceipts] = useState(false);
 
     // Generate initials
     const getInitials = (name) =>
@@ -213,6 +216,39 @@ const ProfilePage = () => {
                         {isEditing && (
                             <span className="profile-char-count">{bio.length}/200</span>
                         )}
+                    </div>
+
+                    {/* Read Receipts Toggle */}
+                    <div className="profile-field">
+                        <label className="profile-field-label">
+                            <Eye size={14} />
+                            Read Receipts
+                        </label>
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs" style={{ color: "var(--text-muted)", maxWidth: "220px" }}>
+                                When enabled, others can see when you've read their messages
+                            </p>
+                            <button
+                                className={`toggle-switch ${readReceipts ? 'toggle-switch-on' : 'toggle-switch-off'}`}
+                                onClick={async () => {
+                                    setTogglingReceipts(true);
+                                    try {
+                                        const newVal = !readReceipts;
+                                        const { data } = await api.put("/users/settings/read-receipts", { enabled: newVal });
+                                        setReadReceipts(newVal);
+                                        updateUser(data.user);
+                                        toast.success(`Read receipts ${newVal ? "enabled" : "disabled"}`);
+                                    } catch (error) {
+                                        toast.error("Failed to update setting.");
+                                    } finally {
+                                        setTogglingReceipts(false);
+                                    }
+                                }}
+                                disabled={togglingReceipts}
+                            >
+                                <span className="toggle-switch-thumb" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Email (read-only) */}

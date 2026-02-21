@@ -16,10 +16,11 @@ model User {
   displayName String   @map("display_name")
   avatarUrl   String   @default("") @map("avatar_url")
   bio         String   @default("")
-  isOnline    Boolean  @default(false) @map("is_online")
-  lastSeen    DateTime @default(now()) @map("last_seen")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  isOnline            Boolean  @default(false) @map("is_online")
+  lastSeen            DateTime @default(now()) @map("last_seen")
+  readReceiptsEnabled Boolean  @default(true) @map("read_receipts_enabled")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
 
   participants ConversationParticipant[]
   messages     Message[]
@@ -44,11 +45,14 @@ model BlockedUser {
 }
 
 model Conversation {
-  id        String   @id @default(uuid()) @db.Uuid
-  isGroup   Boolean  @default(false) @map("is_group")
-  name      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  id          String   @id @default(uuid()) @db.Uuid
+  isGroup     Boolean  @default(false) @map("is_group")
+  name        String?
+  description String?
+  avatarUrl   String?  @map("avatar_url")
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   participants ConversationParticipant[]
   messages     Message[]
@@ -60,6 +64,7 @@ model ConversationParticipant {
   id             String       @id @default(uuid()) @db.Uuid
   conversationId String       @map("conversation_id") @db.Uuid
   userId         String       @map("user_id") @db.Uuid
+  role           String       @default("member")
   joinedAt       DateTime     @default(now()) @map("joined_at")
 
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -74,6 +79,8 @@ model Message {
   conversationId String       @map("conversation_id") @db.Uuid
   senderId       String       @map("sender_id") @db.Uuid
   content        String
+  status         String       @default("sent")
+  readAt         DateTime?    @map("read_at")
   createdAt      DateTime     @default(now()) @map("created_at")
 
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

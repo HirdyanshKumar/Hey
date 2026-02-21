@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useSocket } from "../context/SocketContext";
-import { Send, ArrowLeft, Smile, MoreVertical, ShieldOff, ShieldAlert } from "lucide-react";
+import { Send, ArrowLeft, Smile, MoreVertical, ShieldOff, ShieldAlert, Check, CheckCheck, Users } from "lucide-react";
+import GroupInfoPanel from "./GroupInfoPanel";
 import toast from "react-hot-toast";
 
 const ChatWindow = ({ onBack }) => {
@@ -17,6 +18,7 @@ const ChatWindow = ({ onBack }) => {
         blockUser,
         unblockUser,
         checkBlockStatus,
+        markAsRead,
     } = useChat();
     const { isUserOnline } = useSocket();
     const [input, setInput] = useState("");
@@ -26,6 +28,8 @@ const ChatWindow = ({ onBack }) => {
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const menuRef = useRef(null);
+    const [showGroupInfo, setShowGroupInfo] = useState(false);
+    const isGroup = selectedConversation?.isGroup;
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {
@@ -35,12 +39,19 @@ const ChatWindow = ({ onBack }) => {
     // Focus input when conversation changes
     useEffect(() => {
         inputRef.current?.focus();
-    }, [selectedConversation?.id]);
+        // Mark messages as read when conversation is focused
+        if (selectedConversation?.id) {
+            markAsRead();
+        }
+    }, [selectedConversation?.id, markAsRead]);
 
-    // Check block status when conversation changes
+    // Check block status when conversation changes (only for DMs)
     useEffect(() => {
         const checkBlock = async () => {
-            if (!selectedConversation) return;
+            if (!selectedConversation || selectedConversation.isGroup) {
+                setIsBlocked(false);
+                return;
+            }
             const otherUser = selectedConversation.participants?.find(
                 (p) => p.user.id !== user?.id
             );
@@ -115,10 +126,11 @@ const ChatWindow = ({ onBack }) => {
     const chatName = selectedConversation.isGroup
         ? selectedConversation.name
         : otherParticipants[0]?.user?.displayName || "Unknown";
-    const chatAvatar = otherParticipants[0]?.user?.avatarUrl;
-    const isOnline = otherParticipants[0]?.user?.id
+    const chatAvatar = isGroup ? null : otherParticipants[0]?.user?.avatarUrl;
+    const isOnline = !isGroup && otherParticipants[0]?.user?.id
         ? isUserOnline(otherParticipants[0].user.id)
         : false;
+    const memberCount = selectedConversation.participants?.length || 0;
 
     // Typing indicator
     const typingUserIds = getTypingUsers(selectedConversation.id);
@@ -216,9 +228,11 @@ const ChatWindow = ({ onBack }) => {
                     <p className="text-xs" style={{ color: isOnline ? "var(--online)" : "var(--text-muted)" }}>
                         {typingNames.length > 0
                             ? `${typingNames.join(", ")} typing...`
-                            : isOnline
-                                ? "Online"
-                                : "Offline"}
+                            : isGroup
+                                ? `${memberCount} members`
+                                : isOnline
+                                    ? "Online"
+                                    : "Offline"}
                     </p>
                 </div>
 
@@ -243,19 +257,33 @@ const ChatWindow = ({ onBack }) => {
                                 minWidth: "160px",
                             }}
                         >
-                            <button
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
-                                style={{
-                                    color: isBlocked ? "var(--online)" : "var(--error)",
-                                }}
-                                onClick={handleBlock}
-                                disabled={blockLoading}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                            >
-                                {isBlocked ? <ShieldOff size={16} /> : <ShieldAlert size={16} />}
-                                {blockLoading ? "Loading..." : isBlocked ? "Unblock User" : "Block User"}
-                            </button>
+                            {isGroup && (
+                                <button
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
+                                    style={{ color: "var(--text-primary)" }}
+                                    onClick={() => { setShowGroupInfo(true); setShowMenu(false); }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                >
+                                    <Users size={16} />
+                                    Group Info
+                                </button>
+                            )}
+                            {!isGroup && (
+                                <button
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
+                                    style={{
+                                        color: isBlocked ? "var(--online)" : "var(--error)",
+                                    }}
+                                    onClick={handleBlock}
+                                    disabled={blockLoading}
+                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                                >
+                                    {isBlocked ? <ShieldOff size={16} /> : <ShieldAlert size={16} />}
+                                    {blockLoading ? "Loading..." : isBlocked ? "Unblock User" : "Block User"}
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -336,8 +364,27 @@ const ChatWindow = ({ onBack }) => {
                                         <div
                                             className={`chat-bubble ${isMine ? "chat-bubble-sent" : "chat-bubble-received"}`}
                                         >
+                                            {/* Sender name (group only, received messages) */}
+                                            {isGroup && !isMine && showAvatar && (
+                                                <p className="group-sender-name" style={{ color: getAvatarColor(msg.sender?.displayName) }}>
+                                                    {msg.sender?.displayName}
+                                                </p>
+                                            )}
                                             <p className="text-sm" style={{ lineHeight: "1.45" }}>{msg.content}</p>
-                                            <span className="chat-bubble-time">{formatTime(msg.createdAt)}</span>
+                                            <div className="chat-bubble-meta">
+                                                <span className="chat-bubble-time">{formatTime(msg.createdAt)}</span>
+                                                {isMine && (
+                                                    <span className={`message-receipt message-receipt-${msg.status || 'sent'}`}>
+                                                        {msg.status === 'read' ? (
+                                                            <CheckCheck size={14} />
+                                                        ) : msg.status === 'delivered' ? (
+                                                            <CheckCheck size={14} />
+                                                        ) : (
+                                                            <Check size={14} />
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -406,6 +453,14 @@ const ChatWindow = ({ onBack }) => {
                     <Send size={18} />
                 </button>
             </form>
+
+            {/* Group Info Panel */}
+            {showGroupInfo && isGroup && (
+                <GroupInfoPanel
+                    conversation={selectedConversation}
+                    onClose={() => setShowGroupInfo(false)}
+                />
+            )}
         </div>
     );
 };

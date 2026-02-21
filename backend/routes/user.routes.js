@@ -1,6 +1,6 @@
 const express = require("express");
 const multer = require("multer");
-const { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers } = require("../controllers/user.controller");
+const { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers, updateReadReceiptsSetting } = require("../controllers/user.controller");
 const { authMiddleware } = require("../middleware/auth.middleware");
 
 const router = express.Router();
@@ -34,5 +34,8 @@ router.delete("/block/:userId", unblockUser);
 router.get("/profile/:userId", getProfile);
 router.put("/profile", updateProfile);
 router.put("/avatar", upload.single("avatar"), updateAvatar);
+
+// Read receipt settings
+router.put("/settings/read-receipts", updateReadReceiptsSetting);
 
 module.exports = router;

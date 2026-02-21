@@ -58,12 +58,21 @@ export const ChatProvider = ({ children }) => {
             // Join the conversation room
             if (socket && isConnected) {
                 socket.emit("join:conversation", { conversationId });
+
+                // Mark messages as read when opening conversation
+                socket.emit("message:read", { conversationId });
             }
         } catch (error) {
             console.error("Failed to fetch conversation:", error);
         } finally {
             setLoadingMessages(false);
         }
+    }, [socket, isConnected]);
+
+    // Mark current conversation as read
+    const markAsRead = useCallback(() => {
+        if (!socket || !isConnected || !selectedConvIdRef.current) return;
+        socket.emit("message:read", { conversationId: selectedConvIdRef.current });
     }, [socket, isConnected]);
 
     // Create or open a conversation with a user
@@ -178,12 +187,141 @@ export const ChatProvider = ({ children }) => {
         }
     }, []);
 
+    // ── Group Functions ───────────────────────────────────
+    const createGroup = useCallback(async (name, description, memberIds) => {
+        try {
+            const { data } = await api.post("/groups", { name, description, memberIds });
+            const conv = data.conversation;
+            setConversations((prev) => [conv, ...prev]);
+            await selectConversation(conv.id);
+            if (socket && isConnected) {
+                socket.emit("group:joinRoom", { conversationId: conv.id });
+            }
+            return conv;
+        } catch (error) {
+            console.error("Failed to create group:", error);
+            throw error;
+        }
+    }, [selectConversation, socket, isConnected]);
+
+    const updateGroup = useCallback(async (groupId, updateData) => {
+        try {
+            const { data } = await api.put(`/groups/${groupId}`, updateData);
+            setSelectedConversation(data.conversation);
+            setConversations((prev) => prev.map((c) => c.id === groupId ? { ...c, ...data.conversation } : c));
+            return data.conversation;
+        } catch (error) {
+            console.error("Failed to update group:", error);
+            throw error;
+        }
+    }, []);
+
+    const addMembers = useCallback(async (groupId, memberIds) => {
+        try {
+            const { data } = await api.post(`/groups/${groupId}/members`, { memberIds });
+            setSelectedConversation(data.conversation);
+            setConversations((prev) => prev.map((c) => c.id === groupId ? { ...c, ...data.conversation } : c));
+            return data.conversation;
+        } catch (error) {
+            console.error("Failed to add members:", error);
+            throw error;
+        }
+    }, []);
+
+    const removeMember = useCallback(async (groupId, targetUserId) => {
+        try {
+            await api.delete(`/groups/${groupId}/members/${targetUserId}`);
+            // Update local state
+            setSelectedConversation((prev) => {
+                if (!prev || prev.id !== groupId) return prev;
+                return { ...prev, participants: prev.participants.filter((p) => p.user.id !== targetUserId) };
+            });
+            return true;
+        } catch (error) {
+            console.error("Failed to remove member:", error);
+            throw error;
+        }
+    }, []);
+
+    const promoteMember = useCallback(async (groupId, targetUserId) => {
+        try {
+            await api.put(`/groups/${groupId}/members/${targetUserId}/promote`);
+            setSelectedConversation((prev) => {
+                if (!prev || prev.id !== groupId) return prev;
+                return {
+                    ...prev,
+                    participants: prev.participants.map((p) =>
+                        p.user.id === targetUserId ? { ...p, role: "admin" } : p
+                    ),
+                };
+            });
+            return true;
+        } catch (error) {
+            console.error("Failed to promote member:", error);
+            throw error;
+        }
+    }, []);
+
+    const demoteMember = useCallback(async (groupId, targetUserId) => {
+        try {
+            await api.put(`/groups/${groupId}/members/${targetUserId}/demote`);
+            setSelectedConversation((prev) => {
+                if (!prev || prev.id !== groupId) return prev;
+                return {
+                    ...prev,
+                    participants: prev.participants.map((p) =>
+                        p.user.id === targetUserId ? { ...p, role: "member" } : p
+                    ),
+                };
+            });
+            return true;
+        } catch (error) {
+            console.error("Failed to demote member:", error);
+            throw error;
+        }
+    }, []);
+
+    const leaveGroup = useCallback(async (groupId) => {
+        try {
+            await api.post(`/groups/${groupId}/leave`);
+            if (socket && isConnected) {
+                socket.emit("group:leaveRoom", { conversationId: groupId });
+            }
+            setConversations((prev) => prev.filter((c) => c.id !== groupId));
+            if (selectedConvIdRef.current === groupId) {
+                setSelectedConversation(null);
+                setMessages([]);
+                selectedConvIdRef.current = null;
+            }
+            return true;
+        } catch (error) {
+            console.error("Failed to leave group:", error);
+            throw error;
+        }
+    }, [socket, isConnected]);
+
+    const deleteGroup = useCallback(async (groupId) => {
+        try {
+            await api.delete(`/groups/${groupId}`);
+            setConversations((prev) => prev.filter((c) => c.id !== groupId));
+            if (selectedConvIdRef.current === groupId) {
+                setSelectedConversation(null);
+                setMessages([]);
+                selectedConvIdRef.current = null;
+            }
+            return true;
+        } catch (error) {
+            console.error("Failed to delete group:", error);
+            throw error;
+        }
+    }, []);
+
     // Fetch conversations on mount
     useEffect(() => {
         fetchConversations();
     }, [fetchConversations]);
 
-    // Listen for new messages & typing events
+    // Listen for new messages, typing events, & status updates
     useEffect(() => {
         if (!socket) return;
 
@@ -195,6 +333,24 @@ export const ChatProvider = ({ children }) => {
                     if (prev.some((m) => m.id === message.id)) return prev;
                     return [...prev, message];
                 });
+
+                // Auto-mark as delivered since user is viewing this conversation
+                if (message.senderId !== user?.id && message.sender?.id !== user?.id) {
+                    socket.emit("message:delivered", {
+                        messageIds: [message.id],
+                        conversationId,
+                    });
+                    // Also mark as read since user has the conversation open
+                    socket.emit("message:read", { conversationId });
+                }
+            } else {
+                // Conversation is not selected, but still mark as delivered
+                if (message.senderId !== user?.id && message.sender?.id !== user?.id) {
+                    socket.emit("message:delivered", {
+                        messageIds: [message.id],
+                        conversationId,
+                    });
+                }
             }
 
             // Update the conversation list (last message + move to top)
@@ -212,6 +368,20 @@ export const ChatProvider = ({ children }) => {
                 // Sort by most recent
                 return updated.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
             });
+        };
+
+        // Handle message status updates (sent → delivered → read)
+        const handleStatusUpdate = ({ conversationId, messageIds, status, readAt }) => {
+            if (selectedConvIdRef.current === conversationId) {
+                setMessages((prev) =>
+                    prev.map((msg) => {
+                        if (messageIds.includes(msg.id)) {
+                            return { ...msg, status, ...(readAt ? { readAt } : {}) };
+                        }
+                        return msg;
+                    })
+                );
+            }
         };
 
         const handleTypingStart = ({ conversationId, userId: typingUserId }) => {
@@ -241,14 +411,86 @@ export const ChatProvider = ({ children }) => {
             });
         };
 
+        // ── Group socket events ───────────────────────────
+        const handleGroupUpdated = ({ conversation }) => {
+            setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, ...conversation } : c));
+            if (selectedConvIdRef.current === conversation.id) {
+                setSelectedConversation((prev) => ({ ...prev, ...conversation }));
+            }
+        };
+
+        const handleGroupMemberAdded = ({ conversationId, conversation }) => {
+            setConversations((prev) => {
+                const exists = prev.find((c) => c.id === conversationId);
+                if (exists) return prev.map((c) => c.id === conversationId ? { ...c, ...conversation } : c);
+                return [conversation, ...prev];
+            });
+            if (selectedConvIdRef.current === conversationId && conversation) {
+                setSelectedConversation((prev) => ({ ...prev, ...conversation }));
+            }
+        };
+
+        const handleGroupMemberRemoved = ({ conversationId, userId: removedUserId }) => {
+            if (removedUserId === user?.id) {
+                // Current user was removed
+                setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+                if (selectedConvIdRef.current === conversationId) {
+                    setSelectedConversation(null);
+                    setMessages([]);
+                    selectedConvIdRef.current = null;
+                }
+            } else {
+                // Someone else was removed
+                setSelectedConversation((prev) => {
+                    if (!prev || prev.id !== conversationId) return prev;
+                    return { ...prev, participants: prev.participants.filter((p) => p.user.id !== removedUserId) };
+                });
+            }
+        };
+
+        const handleGroupDeleted = ({ conversationId }) => {
+            setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+            if (selectedConvIdRef.current === conversationId) {
+                setSelectedConversation(null);
+                setMessages([]);
+                selectedConvIdRef.current = null;
+            }
+        };
+
+        const handleGroupRoleChanged = ({ conversationId, userId: targetUserId, role }) => {
+            if (selectedConvIdRef.current === conversationId) {
+                setSelectedConversation((prev) => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        participants: prev.participants.map((p) =>
+                            p.user.id === targetUserId ? { ...p, role } : p
+                        ),
+                    };
+                });
+            }
+        };
+
         socket.on("new:message", handleNewMessage);
+        socket.on("message:statusUpdate", handleStatusUpdate);
         socket.on("typing:start", handleTypingStart);
         socket.on("typing:stop", handleTypingStop);
+        socket.on("group:updated", handleGroupUpdated);
+        socket.on("group:memberAdded", handleGroupMemberAdded);
+        socket.on("group:memberRemoved", handleGroupMemberRemoved);
+        socket.on("group:deleted", handleGroupDeleted);
+        socket.on("group:roleChanged", handleGroupRoleChanged);
 
         return () => {
             socket.off("new:message", handleNewMessage);
+            socket.off("message:statusUpdate", handleStatusUpdate);
             socket.off("typing:start", handleTypingStart);
             socket.off("typing:stop", handleTypingStop);
+            socket.off("group:updated", handleGroupUpdated);
+            socket.off("group:memberAdded", handleGroupMemberAdded);
+            socket.off("group:memberRemoved", handleGroupMemberRemoved);
+            socket.off("group:deleted", handleGroupDeleted);
+            socket.off("group:roleChanged", handleGroupRoleChanged);
         };
     }, [socket, user?.id]);
 
@@ -278,6 +520,16 @@ export const ChatProvider = ({ children }) => {
                 blockUser,
                 unblockUser,
                 checkBlockStatus,
+                markAsRead,
+                // Group functions
+                createGroup,
+                updateGroup,
+                addMembers,
+                removeMember,
+                promoteMember,
+                demoteMember,
+                leaveGroup,
+                deleteGroup,
             }}
         >
             {children}

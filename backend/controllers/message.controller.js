@@ -24,6 +24,7 @@ const getMessages = async (req, res) => {
             include: {
                 sender: { select: { id: true, displayName: true, avatarUrl: true } },
             },
+            // status and readAt are included by default (no select filter on Message)
         };
 
         if (cursor) {

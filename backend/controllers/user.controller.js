@@ -16,6 +16,7 @@ const getProfile = async (req, res, next) => {
                 bio: true,
                 isOnline: true,
                 lastSeen: true,
+                readReceiptsEnabled: true,
                 createdAt: true,
             },
         });
@@ -67,6 +68,7 @@ const updateProfile = async (req, res, next) => {
                 bio: true,
                 isOnline: true,
                 lastSeen: true,
+                readReceiptsEnabled: true,
                 createdAt: true,
             },
         });
@@ -235,4 +237,35 @@ const getBlockedUsers = async (req, res, next) => {
     }
 };
 
-module.exports = { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers };
+// PUT /api/users/settings/read-receipts — Toggle read receipts
+const updateReadReceiptsSetting = async (req, res, next) => {
+    try {
+        const { enabled } = req.body;
+
+        if (typeof enabled !== "boolean") {
+            return res.status(400).json({ error: "'enabled' must be a boolean." });
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: req.user.id },
+            data: { readReceiptsEnabled: enabled },
+            select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                bio: true,
+                isOnline: true,
+                lastSeen: true,
+                readReceiptsEnabled: true,
+                createdAt: true,
+            },
+        });
+
+        res.json({ message: `Read receipts ${enabled ? "enabled" : "disabled"}.`, user: updatedUser });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers, updateReadReceiptsSetting };

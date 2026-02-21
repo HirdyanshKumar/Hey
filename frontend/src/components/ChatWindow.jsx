@@ -2,9 +2,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useSocket } from "../context/SocketContext";
-import { Send, ArrowLeft, Smile, MoreVertical, ShieldOff, ShieldAlert, Check, CheckCheck, Users } from "lucide-react";
+import {
+    Send, ArrowLeft, Smile, MoreVertical, ShieldOff, ShieldAlert,
+    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight
+} from "lucide-react";
 import GroupInfoPanel from "./GroupInfoPanel";
 import toast from "react-hot-toast";
+
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
+const DELETE_WINDOW_MS = 60 * 60 * 1000;
 
 const ChatWindow = ({ onBack }) => {
     const { user } = useAuth();
@@ -19,6 +25,16 @@ const ChatWindow = ({ onBack }) => {
         unblockUser,
         checkBlockStatus,
         markAsRead,
+        // Phase 8
+        replyingTo,
+        setReplyingTo,
+        cancelReply,
+        editingMessage,
+        setEditingMessage,
+        cancelEdit,
+        editMessage,
+        deleteMessageForSelf,
+        deleteMessageForEveryone,
     } = useChat();
     const { isUserOnline } = useSocket();
     const [input, setInput] = useState("");
@@ -31,6 +47,10 @@ const ChatWindow = ({ onBack }) => {
     const [showGroupInfo, setShowGroupInfo] = useState(false);
     const isGroup = selectedConversation?.isGroup;
 
+    // ── Context menu state ────────────────────────────────
+    const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
+    const contextMenuRef = useRef(null);
+
     // Auto-scroll to bottom on new messages
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -39,11 +59,18 @@ const ChatWindow = ({ onBack }) => {
     // Focus input when conversation changes
     useEffect(() => {
         inputRef.current?.focus();
-        // Mark messages as read when conversation is focused
         if (selectedConversation?.id) {
             markAsRead();
         }
     }, [selectedConversation?.id, markAsRead]);
+
+    // Pre-fill input when editing
+    useEffect(() => {
+        if (editingMessage) {
+            setInput(editingMessage.content);
+            inputRef.current?.focus();
+        }
+    }, [editingMessage]);
 
     // Check block status when conversation changes (only for DMs)
     useEffect(() => {
@@ -63,27 +90,45 @@ const ChatWindow = ({ onBack }) => {
         checkBlock();
     }, [selectedConversation?.id, user?.id, checkBlockStatus]);
 
-    // Close menu on outside click
+    // Close menus on outside click
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (menuRef.current && !menuRef.current.contains(e.target)) {
                 setShowMenu(false);
+            }
+            if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+                setContextMenu(null);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // Close context menu on scroll
+    useEffect(() => {
+        const handleScroll = () => setContextMenu(null);
+        const area = document.querySelector(".chat-messages-area");
+        area?.addEventListener("scroll", handleScroll);
+        return () => area?.removeEventListener("scroll", handleScroll);
+    }, []);
+
     const handleSend = (e) => {
         e.preventDefault();
         if (!input.trim() || isBlocked) return;
+
+        if (editingMessage) {
+            editMessage(editingMessage.id, input.trim());
+            setInput("");
+            return;
+        }
+
         sendMessage(input.trim());
         setInput("");
     };
 
     const handleInputChange = (e) => {
         setInput(e.target.value);
-        if (e.target.value.trim()) {
+        if (e.target.value.trim() && !editingMessage) {
             resetTypingTimeout();
         }
     };
@@ -114,6 +159,62 @@ const ChatWindow = ({ onBack }) => {
         } finally {
             setBlockLoading(false);
             setShowMenu(false);
+        }
+    };
+
+    // ── Context Menu ──────────────────────────────────────
+    const handleContextMenu = (e, msg) => {
+        e.preventDefault();
+        if (msg.isDeleted) return;
+
+        const rect = e.currentTarget.closest(".chat-messages-area")?.getBoundingClientRect();
+        const x = e.clientX - (rect?.left || 0);
+        const y = e.clientY - (rect?.top || 0);
+
+        setContextMenu({ x, y, message: msg });
+    };
+
+    const handleReply = (msg) => {
+        setReplyingTo(msg);
+        cancelEdit();
+        setContextMenu(null);
+        inputRef.current?.focus();
+    };
+
+    const handleEdit = (msg) => {
+        setEditingMessage(msg);
+        cancelReply();
+        setContextMenu(null);
+    };
+
+    const handleDeleteForSelf = async (msg) => {
+        try {
+            await deleteMessageForSelf(msg.id);
+            toast.success("Message deleted for you");
+        } catch {
+            toast.error("Failed to delete");
+        }
+        setContextMenu(null);
+    };
+
+    const handleDeleteForEveryone = (msg) => {
+        deleteMessageForEveryone(msg.id);
+        toast.success("Message deleted for everyone");
+        setContextMenu(null);
+    };
+
+    const handleCancelEdit = () => {
+        cancelEdit();
+        setInput("");
+    };
+
+    // Scroll to a replied-to message
+    const scrollToMessage = (messageId) => {
+        const el = document.getElementById(`msg-${messageId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("msg-highlight");
+            setTimeout(() => el.classList.remove("msg-highlight"), 1500);
         }
     };
 
@@ -172,12 +273,25 @@ const ChatWindow = ({ onBack }) => {
         return date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
     };
 
-    // Group messages with date separators
     const shouldShowDateSeparator = (msg, index) => {
         if (index === 0) return true;
         const prevDate = new Date(messages[index - 1].createdAt).toDateString();
         const currDate = new Date(msg.createdAt).toDateString();
         return prevDate !== currDate;
+    };
+
+    const canEdit = (msg) => {
+        const isMine = msg.sender?.id === user?.id || msg.senderId === user?.id;
+        if (!isMine || msg.isDeleted) return false;
+        const elapsed = Date.now() - new Date(msg.createdAt).getTime();
+        return elapsed <= EDIT_WINDOW_MS;
+    };
+
+    const canDeleteForEveryone = (msg) => {
+        const isMine = msg.sender?.id === user?.id || msg.senderId === user?.id;
+        if (!isMine || msg.isDeleted) return false;
+        const elapsed = Date.now() - new Date(msg.createdAt).getTime();
+        return elapsed <= DELETE_WINDOW_MS;
     };
 
     return (
@@ -187,7 +301,6 @@ const ChatWindow = ({ onBack }) => {
                 className="flex items-center gap-3 px-5 py-3 border-b"
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-secondary)" }}
             >
-                {/* Back button (mobile) */}
                 <button
                     className="chat-back-btn md:hidden p-2 rounded-lg transition-fast"
                     style={{ color: "var(--text-secondary)" }}
@@ -199,11 +312,7 @@ const ChatWindow = ({ onBack }) => {
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">
                     {chatAvatar ? (
-                        <img
-                            src={chatAvatar}
-                            alt={chatName}
-                            className="w-10 h-10 rounded-full object-cover"
-                        />
+                        <img src={chatAvatar} alt={chatName} className="w-10 h-10 rounded-full object-cover" />
                     ) : (
                         <div
                             className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white"
@@ -272,9 +381,7 @@ const ChatWindow = ({ onBack }) => {
                             {!isGroup && (
                                 <button
                                     className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
-                                    style={{
-                                        color: isBlocked ? "var(--online)" : "var(--error)",
-                                    }}
+                                    style={{ color: isBlocked ? "var(--online)" : "var(--error)" }}
                                     onClick={handleBlock}
                                     disabled={blockLoading}
                                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
@@ -305,7 +412,7 @@ const ChatWindow = ({ onBack }) => {
             )}
 
             {/* ── Messages Area ─────────────────────────────── */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 chat-messages-area">
+            <div className="flex-1 overflow-y-auto px-5 py-4 chat-messages-area" style={{ position: "relative" }}>
                 {loadingMessages ? (
                     <div className="flex items-center justify-center h-full">
                         <div className="chat-loading-spinner" />
@@ -328,7 +435,7 @@ const ChatWindow = ({ onBack }) => {
                             const showDate = shouldShowDateSeparator(msg, index);
 
                             return (
-                                <div key={msg.id}>
+                                <div key={msg.id} id={`msg-${msg.id}`}>
                                     {/* Date separator */}
                                     {showDate && (
                                         <div className="chat-date-separator">
@@ -337,10 +444,11 @@ const ChatWindow = ({ onBack }) => {
                                     )}
 
                                     <div
-                                        className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : "flex-row"}`}
+                                        className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : "flex-row"} msg-row`}
                                         style={{ marginTop: showAvatar || showDate ? "12px" : "2px" }}
+                                        onContextMenu={(e) => handleContextMenu(e, msg)}
                                     >
-                                        {/* Sender avatar (only for received msgs) */}
+                                        {/* Sender avatar */}
                                         <div className="w-7 flex-shrink-0">
                                             {showAvatar && !isMine && (
                                                 msg.sender?.avatarUrl ? (
@@ -362,18 +470,53 @@ const ChatWindow = ({ onBack }) => {
 
                                         {/* Message bubble */}
                                         <div
-                                            className={`chat-bubble ${isMine ? "chat-bubble-sent" : "chat-bubble-received"}`}
+                                            className={`chat-bubble ${isMine ? "chat-bubble-sent" : "chat-bubble-received"} ${msg.isDeleted ? "msg-deleted-bubble" : ""}`}
                                         >
                                             {/* Sender name (group only, received messages) */}
-                                            {isGroup && !isMine && showAvatar && (
+                                            {isGroup && !isMine && showAvatar && !msg.isDeleted && (
                                                 <p className="group-sender-name" style={{ color: getAvatarColor(msg.sender?.displayName) }}>
                                                     {msg.sender?.displayName}
                                                 </p>
                                             )}
-                                            <p className="text-sm" style={{ lineHeight: "1.45" }}>{msg.content}</p>
+
+                                            {/* Reply preview (inline) */}
+                                            {msg.replyTo && !msg.isDeleted && (
+                                                <div
+                                                    className="reply-preview-inline"
+                                                    onClick={() => scrollToMessage(msg.replyTo.id)}
+                                                >
+                                                    <div className="reply-preview-inline-bar" />
+                                                    <div className="reply-preview-inline-content">
+                                                        <span className="reply-preview-inline-name">
+                                                            {msg.replyTo.sender?.displayName || "Unknown"}
+                                                        </span>
+                                                        <span className="reply-preview-inline-text">
+                                                            {msg.replyTo.isDeleted
+                                                                ? "🚫 This message was deleted"
+                                                                : msg.replyTo.content?.length > 60
+                                                                    ? msg.replyTo.content.substring(0, 60) + "..."
+                                                                    : msg.replyTo.content}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Message content or deleted placeholder */}
+                                            {msg.isDeleted ? (
+                                                <p className="msg-deleted-placeholder">
+                                                    🚫 This message was deleted
+                                                </p>
+                                            ) : (
+                                                <p className="text-sm" style={{ lineHeight: "1.45" }}>{msg.content}</p>
+                                            )}
+
+                                            {/* Meta: time + edited + receipt */}
                                             <div className="chat-bubble-meta">
+                                                {msg.isEdited && !msg.isDeleted && (
+                                                    <span className="msg-edited-tag">edited</span>
+                                                )}
                                                 <span className="chat-bubble-time">{formatTime(msg.createdAt)}</span>
-                                                {isMine && (
+                                                {isMine && !msg.isDeleted && (
                                                     <span className={`message-receipt message-receipt-${msg.status || 'sent'}`}>
                                                         {msg.status === 'read' ? (
                                                             <CheckCheck size={14} />
@@ -408,7 +551,82 @@ const ChatWindow = ({ onBack }) => {
                         <div ref={messagesEndRef} />
                     </div>
                 )}
+
+                {/* ── Context Menu ─────────────────────────────── */}
+                {contextMenu && (
+                    <div
+                        ref={contextMenuRef}
+                        className="msg-context-menu"
+                        style={{
+                            top: contextMenu.y,
+                            left: Math.min(contextMenu.x, 250),
+                        }}
+                    >
+                        {/* Reply */}
+                        <button className="msg-context-item" onClick={() => handleReply(contextMenu.message)}>
+                            <Reply size={15} />
+                            Reply
+                        </button>
+
+                        {/* Edit (own messages, within window) */}
+                        {canEdit(contextMenu.message) && (
+                            <button className="msg-context-item" onClick={() => handleEdit(contextMenu.message)}>
+                                <Pencil size={15} />
+                                Edit
+                            </button>
+                        )}
+
+                        {/* Delete for me */}
+                        <button className="msg-context-item msg-context-item-danger" onClick={() => handleDeleteForSelf(contextMenu.message)}>
+                            <Trash2 size={15} />
+                            Delete for me
+                        </button>
+
+                        {/* Delete for everyone (own messages, within window) */}
+                        {canDeleteForEveryone(contextMenu.message) && (
+                            <button className="msg-context-item msg-context-item-danger" onClick={() => handleDeleteForEveryone(contextMenu.message)}>
+                                <Trash2 size={15} />
+                                Delete for everyone
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
+
+            {/* ── Reply Preview Bar ──────────────────────────── */}
+            {replyingTo && (
+                <div className="reply-preview-bar">
+                    <div className="reply-preview-bar-left">
+                        <CornerUpRight size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                        <div className="reply-preview-bar-content">
+                            <span className="reply-preview-bar-name">
+                                {replyingTo.sender?.displayName || "Unknown"}
+                            </span>
+                            <span className="reply-preview-bar-text">
+                                {replyingTo.content?.length > 80
+                                    ? replyingTo.content.substring(0, 80) + "..."
+                                    : replyingTo.content}
+                            </span>
+                        </div>
+                    </div>
+                    <button className="reply-preview-bar-close" onClick={cancelReply}>
+                        <X size={16} />
+                    </button>
+                </div>
+            )}
+
+            {/* ── Edit Mode Bar ──────────────────────────────── */}
+            {editingMessage && (
+                <div className="edit-mode-bar">
+                    <div className="edit-mode-bar-left">
+                        <Pencil size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                        <span className="edit-mode-bar-label">Editing message</span>
+                    </div>
+                    <button className="reply-preview-bar-close" onClick={handleCancelEdit}>
+                        <X size={16} />
+                    </button>
+                </div>
+            )}
 
             {/* ── Message Input ──────────────────────────────── */}
             <form
@@ -429,13 +647,13 @@ const ChatWindow = ({ onBack }) => {
                     type="text"
                     value={input}
                     onChange={handleInputChange}
-                    placeholder={isBlocked ? "You blocked this user" : "Type a message..."}
+                    placeholder={isBlocked ? "You blocked this user" : editingMessage ? "Edit your message..." : "Type a message..."}
                     disabled={isBlocked}
                     className="flex-1 py-2.5 px-4 rounded-xl text-sm outline-none"
                     style={{
                         backgroundColor: "var(--bg-input)",
                         color: "var(--text-primary)",
-                        border: "1px solid var(--border)",
+                        border: editingMessage ? "1px solid var(--accent)" : "1px solid var(--border)",
                         opacity: isBlocked ? 0.5 : 1,
                     }}
                 />
@@ -450,7 +668,7 @@ const ChatWindow = ({ onBack }) => {
                         cursor: input.trim() && !isBlocked ? "pointer" : "default",
                     }}
                 >
-                    <Send size={18} />
+                    {editingMessage ? <Check size={18} /> : <Send size={18} />}
                 </button>
             </form>
 

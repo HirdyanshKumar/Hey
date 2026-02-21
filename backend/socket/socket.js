@@ -176,7 +176,7 @@ const initializeSocket = (io) => {
         });
 
         // ── Send a message ────────────────────────────────
-        socket.on("send:message", async ({ conversationId, content }) => {
+        socket.on("send:message", async ({ conversationId, content, replyToId }) => {
             try {
                 if (!content?.trim()) return;
 
@@ -231,16 +231,32 @@ const initializeSocket = (io) => {
 
                 const initialStatus = anyRecipientInRoom ? "delivered" : "sent";
 
+                // Build message data
+                const messageData = {
+                    conversationId,
+                    senderId: userId,
+                    content: content.trim(),
+                    status: initialStatus,
+                };
+
+                // Add replyToId if provided
+                if (replyToId) {
+                    messageData.replyToId = replyToId;
+                }
+
                 // Persist message to DB
                 const message = await prisma.message.create({
-                    data: {
-                        conversationId,
-                        senderId: userId,
-                        content: content.trim(),
-                        status: initialStatus,
-                    },
+                    data: messageData,
                     include: {
                         sender: { select: { id: true, displayName: true, avatarUrl: true } },
+                        replyTo: {
+                            select: {
+                                id: true,
+                                content: true,
+                                isDeleted: true,
+                                sender: { select: { id: true, displayName: true } },
+                            },
+                        },
                     },
                 });
 
@@ -266,6 +282,74 @@ const initializeSocket = (io) => {
             } catch (err) {
                 console.error("send:message error:", err.message);
                 socket.emit("error", { message: "Failed to send message." });
+            }
+        });
+
+        // ── Edit a message (real-time) ────────────────────────
+        socket.on("message:edit", async ({ messageId, content }) => {
+            try {
+                if (!content?.trim()) return;
+
+                const message = await prisma.message.findUnique({ where: { id: messageId } });
+                if (!message || message.senderId !== userId || message.isDeleted) return;
+
+                const elapsed = Date.now() - new Date(message.createdAt).getTime();
+                if (elapsed > 15 * 60 * 1000) {
+                    return socket.emit("error", { message: "Edit window has expired." });
+                }
+
+                const updated = await prisma.message.update({
+                    where: { id: messageId },
+                    data: { content: content.trim(), isEdited: true, editedAt: new Date() },
+                    include: {
+                        sender: { select: { id: true, displayName: true, avatarUrl: true } },
+                        replyTo: {
+                            select: {
+                                id: true,
+                                content: true,
+                                isDeleted: true,
+                                sender: { select: { id: true, displayName: true } },
+                            },
+                        },
+                    },
+                });
+
+                io.to(`conv:${message.conversationId}`).emit("message:edited", {
+                    conversationId: message.conversationId,
+                    message: updated,
+                });
+
+                console.log(`✏️ Message ${messageId} edited by ${userId}`);
+            } catch (err) {
+                console.error("message:edit error:", err.message);
+            }
+        });
+
+        // ── Delete message for everyone (real-time) ──────────
+        socket.on("message:deleteForEveryone", async ({ messageId }) => {
+            try {
+                const message = await prisma.message.findUnique({ where: { id: messageId } });
+                if (!message || message.senderId !== userId) return;
+
+                const elapsed = Date.now() - new Date(message.createdAt).getTime();
+                if (elapsed > 60 * 60 * 1000) {
+                    return socket.emit("error", { message: "Delete window has expired." });
+                }
+
+                await prisma.message.update({
+                    where: { id: messageId },
+                    data: { isDeleted: true, deletedForAll: true, content: "" },
+                });
+
+                io.to(`conv:${message.conversationId}`).emit("message:deleted", {
+                    conversationId: message.conversationId,
+                    messageId,
+                    deletedForAll: true,
+                });
+
+                console.log(`🗑️ Message ${messageId} deleted for everyone by ${userId}`);
+            } catch (err) {
+                console.error("message:deleteForEveryone error:", err.message);
             }
         });
 

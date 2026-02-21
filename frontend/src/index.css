@@ -876,3 +876,246 @@ a:hover {
   margin-bottom: 2px;
   line-height: 1.2;
 }
+
+/* ── Phase 8: Context Menu ─────────────────────── */
+.msg-context-menu {
+  position: absolute;
+  z-index: 60;
+  min-width: 180px;
+  padding: 6px 0;
+  border-radius: 12px;
+  background: rgba(21, 29, 46, 0.92);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  animation: contextMenuIn 0.15s ease;
+}
+
+@keyframes contextMenuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.msg-context-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 16px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.12s;
+  text-align: left;
+}
+
+.msg-context-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.msg-context-item-danger {
+  color: var(--error);
+}
+
+.msg-context-item-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ── Phase 8: Reply Preview Bar (above input) ──── */
+.reply-preview-bar,
+.edit-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  animation: slideBarIn 0.2s ease;
+}
+
+@keyframes slideBarIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reply-preview-bar-left,
+.edit-mode-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.reply-preview-bar-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reply-preview-bar-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.reply-preview-bar-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reply-preview-bar-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.reply-preview-bar-close:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.edit-mode-bar-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+/* ── Phase 8: Inline Reply Preview (in bubble) ─── */
+.reply-preview-inline {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 0.15s;
+  overflow: hidden;
+}
+
+.chat-bubble-sent .reply-preview-inline {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.reply-preview-inline:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-bubble-sent .reply-preview-inline:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.reply-preview-inline-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+.reply-preview-inline-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reply-preview-inline-name {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.3;
+}
+
+.chat-bubble-sent .reply-preview-inline-name {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.reply-preview-inline-text {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.chat-bubble-sent .reply-preview-inline-text {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* ── Phase 8: Edited Tag ───────────────────────── */
+.msg-edited-tag {
+  font-size: 0.5625rem;
+  font-style: italic;
+  opacity: 0.55;
+  margin-right: 2px;
+}
+
+/* ── Phase 8: Deleted Message ──────────────────── */
+.msg-deleted-placeholder {
+  font-size: 0.8125rem;
+  font-style: italic;
+  opacity: 0.5;
+  line-height: 1.4;
+}
+
+.msg-deleted-bubble {
+  opacity: 0.7;
+}
+
+/* ── Phase 8: Message Highlight (scroll-to) ────── */
+.msg-highlight .chat-bubble {
+  animation: msgHighlight 1.5s ease;
+}
+
+@keyframes msgHighlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+  }
+
+  30% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+/* ── Phase 8: Message Row hover actions hint ───── */
+.msg-row {
+  position: relative;
+}

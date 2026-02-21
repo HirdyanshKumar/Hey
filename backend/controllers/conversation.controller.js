@@ -113,7 +113,17 @@ const getConversationById = async (req, res) => {
                 },
                 messages: {
                     orderBy: { createdAt: "asc" },
-                    include: { sender: { select: { id: true, displayName: true, avatarUrl: true } } },
+                    include: {
+                        sender: { select: { id: true, displayName: true, avatarUrl: true } },
+                        replyTo: {
+                            select: {
+                                id: true,
+                                content: true,
+                                isDeleted: true,
+                                sender: { select: { id: true, displayName: true } },
+                            },
+                        },
+                    },
                 },
             },
         });

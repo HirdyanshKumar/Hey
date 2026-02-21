@@ -21,10 +21,17 @@ export const ChatProvider = ({ children }) => {
     const [messages, setMessages] = useState([]);
     const [loadingConversations, setLoadingConversations] = useState(true);
     const [loadingMessages, setLoadingMessages] = useState(false);
-    const [typingUsers, setTypingUsers] = useState({}); // { conversationId: Set<userId> }
+    const [typingUsers, setTypingUsers] = useState({});
     const selectedConvIdRef = useRef(null);
     const typingTimeoutRef = useRef(null);
     const isTypingRef = useRef(false);
+
+    // ── Phase 8: Reply & Edit state ───────────────────────
+    const [replyingTo, setReplyingTo] = useState(null);
+    const [editingMessage, setEditingMessage] = useState(null);
+
+    const cancelReply = useCallback(() => setReplyingTo(null), []);
+    const cancelEdit = useCallback(() => setEditingMessage(null), []);
 
     // Fetch all conversations
     const fetchConversations = useCallback(async () => {
@@ -55,11 +62,13 @@ export const ChatProvider = ({ children }) => {
             setMessages(data.conversation.messages || []);
             selectedConvIdRef.current = conversationId;
 
+            // Reset reply/edit state when switching conversations
+            setReplyingTo(null);
+            setEditingMessage(null);
+
             // Join the conversation room
             if (socket && isConnected) {
                 socket.emit("join:conversation", { conversationId });
-
-                // Mark messages as read when opening conversation
                 socket.emit("message:read", { conversationId });
             }
         } catch (error) {
@@ -81,17 +90,14 @@ export const ChatProvider = ({ children }) => {
             const { data } = await api.post("/conversations", { participantId });
             const conv = data.conversation;
 
-            // Add to list if not already present
             setConversations((prev) => {
                 const exists = prev.find((c) => c.id === conv.id);
                 if (exists) return prev;
                 return [conv, ...prev];
             });
 
-            // Select the new conversation
             await selectConversation(conv.id);
 
-            // Join the room so messages arrive immediately
             if (socket && isConnected) {
                 socket.emit("join:conversation", { conversationId: conv.id });
             }
@@ -103,17 +109,54 @@ export const ChatProvider = ({ children }) => {
         }
     }, [selectConversation, socket, isConnected]);
 
-    // Send a message via Socket.IO
+    // Send a message via Socket.IO (supports replyToId)
     const sendMessage = useCallback((content) => {
         if (!socket || !isConnected || !selectedConvIdRef.current) return;
 
-        socket.emit("send:message", {
+        const payload = {
             conversationId: selectedConvIdRef.current,
             content,
-        });
+        };
 
+        if (replyingTo) {
+            payload.replyToId = replyingTo.id;
+        }
+
+        socket.emit("send:message", payload);
+
+        // Clear reply state after sending
+        setReplyingTo(null);
         // Stop typing when sending
         stopTyping();
+    }, [socket, isConnected, replyingTo]);
+
+    // ── Phase 8: Edit message ─────────────────────────────
+    const editMessage = useCallback(async (messageId, content) => {
+        if (!socket || !isConnected) return;
+
+        // Real-time via socket
+        socket.emit("message:edit", { messageId, content });
+
+        // Clear edit state
+        setEditingMessage(null);
+    }, [socket, isConnected]);
+
+    // ── Phase 8: Delete message for self (HTTP only) ──────
+    const deleteMessageForSelf = useCallback(async (messageId) => {
+        try {
+            await api.delete(`/messages/${messageId}/self`);
+            // Remove from local state immediately
+            setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        } catch (error) {
+            console.error("Failed to delete message for self:", error);
+            throw error;
+        }
+    }, []);
+
+    // ── Phase 8: Delete message for everyone (socket) ─────
+    const deleteMessageForEveryone = useCallback((messageId) => {
+        if (!socket || !isConnected) return;
+        socket.emit("message:deleteForEveryone", { messageId });
     }, [socket, isConnected]);
 
     // Typing indicators
@@ -123,7 +166,6 @@ export const ChatProvider = ({ children }) => {
         isTypingRef.current = true;
         socket.emit("typing:start", { conversationId: selectedConvIdRef.current });
 
-        // Auto-stop typing after 3 seconds of no new typing events
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => {
             stopTyping();
@@ -177,7 +219,6 @@ export const ChatProvider = ({ children }) => {
         }
     }, []);
 
-    // Check block status for a conversation
     const checkBlockStatus = useCallback(async (targetUserId) => {
         try {
             const { data } = await api.get("/users/blocked");
@@ -231,7 +272,6 @@ export const ChatProvider = ({ children }) => {
     const removeMember = useCallback(async (groupId, targetUserId) => {
         try {
             await api.delete(`/groups/${groupId}/members/${targetUserId}`);
-            // Update local state
             setSelectedConversation((prev) => {
                 if (!prev || prev.id !== groupId) return prev;
                 return { ...prev, participants: prev.participants.filter((p) => p.user.id !== targetUserId) };
@@ -321,56 +361,38 @@ export const ChatProvider = ({ children }) => {
         fetchConversations();
     }, [fetchConversations]);
 
-    // Listen for new messages, typing events, & status updates
+    // Listen for new messages, typing events, status updates, edits, deletions
     useEffect(() => {
         if (!socket) return;
 
         const handleNewMessage = ({ conversationId, message }) => {
-            // Update message list if this conversation is currently selected
             if (selectedConvIdRef.current === conversationId) {
                 setMessages((prev) => {
-                    // Avoid duplicates
                     if (prev.some((m) => m.id === message.id)) return prev;
                     return [...prev, message];
                 });
 
-                // Auto-mark as delivered since user is viewing this conversation
                 if (message.senderId !== user?.id && message.sender?.id !== user?.id) {
-                    socket.emit("message:delivered", {
-                        messageIds: [message.id],
-                        conversationId,
-                    });
-                    // Also mark as read since user has the conversation open
+                    socket.emit("message:delivered", { messageIds: [message.id], conversationId });
                     socket.emit("message:read", { conversationId });
                 }
             } else {
-                // Conversation is not selected, but still mark as delivered
                 if (message.senderId !== user?.id && message.sender?.id !== user?.id) {
-                    socket.emit("message:delivered", {
-                        messageIds: [message.id],
-                        conversationId,
-                    });
+                    socket.emit("message:delivered", { messageIds: [message.id], conversationId });
                 }
             }
 
-            // Update the conversation list (last message + move to top)
             setConversations((prev) => {
                 const updated = prev.map((c) => {
                     if (c.id === conversationId) {
-                        return {
-                            ...c,
-                            messages: [message],
-                            updatedAt: message.createdAt,
-                        };
+                        return { ...c, messages: [message], updatedAt: message.createdAt };
                     }
                     return c;
                 });
-                // Sort by most recent
                 return updated.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
             });
         };
 
-        // Handle message status updates (sent → delivered → read)
         const handleStatusUpdate = ({ conversationId, messageIds, status, readAt }) => {
             if (selectedConvIdRef.current === conversationId) {
                 setMessages((prev) =>
@@ -384,8 +406,40 @@ export const ChatProvider = ({ children }) => {
             }
         };
 
+        // ── Phase 8: Handle edited messages ──────────────
+        const handleMessageEdited = ({ conversationId, message: updatedMsg }) => {
+            if (selectedConvIdRef.current === conversationId) {
+                setMessages((prev) =>
+                    prev.map((msg) => (msg.id === updatedMsg.id ? updatedMsg : msg))
+                );
+            }
+            // Also update sidebar last message if it was the last one
+            setConversations((prev) =>
+                prev.map((c) => {
+                    if (c.id === conversationId && c.messages?.[0]?.id === updatedMsg.id) {
+                        return { ...c, messages: [updatedMsg] };
+                    }
+                    return c;
+                })
+            );
+        };
+
+        // ── Phase 8: Handle deleted messages ─────────────
+        const handleMessageDeleted = ({ conversationId, messageId, deletedForAll }) => {
+            if (selectedConvIdRef.current === conversationId) {
+                setMessages((prev) =>
+                    prev.map((msg) => {
+                        if (msg.id === messageId) {
+                            return { ...msg, isDeleted: true, deletedForAll, content: "" };
+                        }
+                        return msg;
+                    })
+                );
+            }
+        };
+
         const handleTypingStart = ({ conversationId, userId: typingUserId }) => {
-            if (typingUserId === user?.id) return; // Ignore own typing
+            if (typingUserId === user?.id) return;
             setTypingUsers((prev) => {
                 const newState = { ...prev };
                 if (!newState[conversationId]) {
@@ -432,7 +486,6 @@ export const ChatProvider = ({ children }) => {
 
         const handleGroupMemberRemoved = ({ conversationId, userId: removedUserId }) => {
             if (removedUserId === user?.id) {
-                // Current user was removed
                 setConversations((prev) => prev.filter((c) => c.id !== conversationId));
                 if (selectedConvIdRef.current === conversationId) {
                     setSelectedConversation(null);
@@ -440,7 +493,6 @@ export const ChatProvider = ({ children }) => {
                     selectedConvIdRef.current = null;
                 }
             } else {
-                // Someone else was removed
                 setSelectedConversation((prev) => {
                     if (!prev || prev.id !== conversationId) return prev;
                     return { ...prev, participants: prev.participants.filter((p) => p.user.id !== removedUserId) };
@@ -473,6 +525,8 @@ export const ChatProvider = ({ children }) => {
 
         socket.on("new:message", handleNewMessage);
         socket.on("message:statusUpdate", handleStatusUpdate);
+        socket.on("message:edited", handleMessageEdited);
+        socket.on("message:deleted", handleMessageDeleted);
         socket.on("typing:start", handleTypingStart);
         socket.on("typing:stop", handleTypingStop);
         socket.on("group:updated", handleGroupUpdated);
@@ -484,6 +538,8 @@ export const ChatProvider = ({ children }) => {
         return () => {
             socket.off("new:message", handleNewMessage);
             socket.off("message:statusUpdate", handleStatusUpdate);
+            socket.off("message:edited", handleMessageEdited);
+            socket.off("message:deleted", handleMessageDeleted);
             socket.off("typing:start", handleTypingStart);
             socket.off("typing:stop", handleTypingStop);
             socket.off("group:updated", handleGroupUpdated);
@@ -530,6 +586,16 @@ export const ChatProvider = ({ children }) => {
                 demoteMember,
                 leaveGroup,
                 deleteGroup,
+                // Phase 8: Edit, Delete, Reply
+                replyingTo,
+                setReplyingTo,
+                cancelReply,
+                editingMessage,
+                setEditingMessage,
+                cancelEdit,
+                editMessage,
+                deleteMessageForSelf,
+                deleteMessageForEveryone,
             }}
         >
             {children}

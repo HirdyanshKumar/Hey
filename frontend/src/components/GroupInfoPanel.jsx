@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useSocket } from "../context/SocketContext";
@@ -55,7 +55,7 @@ const GroupInfoPanel = ({ conversation, onClose }) => {
         }
     };
 
-    const handleSearchUsers = useCallback(async (query) => {
+    const handleSearchUsers = async (query) => {
         setSearchQuery(query);
         if (!query || query.trim().length < 1) {
             setSearchResults([]);
@@ -72,7 +72,7 @@ const GroupInfoPanel = ({ conversation, onClose }) => {
         } finally {
             setSearching(false);
         }
-    }, [conversation.participants]);
+    };
 
     const handleAddMember = async (targetUser) => {
         setActionLoading(targetUser.id);

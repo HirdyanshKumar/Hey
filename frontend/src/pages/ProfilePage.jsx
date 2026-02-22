@@ -238,7 +238,7 @@ const ProfilePage = () => {
                                         setReadReceipts(newVal);
                                         updateUser(data.user);
                                         toast.success(`Read receipts ${newVal ? "enabled" : "disabled"}`);
-                                    } catch (error) {
+                                    } catch {
                                         toast.error("Failed to update setting.");
                                     } finally {
                                         setTogglingReceipts(false);

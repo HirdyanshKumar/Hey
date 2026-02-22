@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useSocket } from "./SocketContext";
 import { useAuth } from "./AuthContext";
@@ -29,6 +30,9 @@ export const ChatProvider = ({ children }) => {
     // ── Phase 8: Reply & Edit state ───────────────────────
     const [replyingTo, setReplyingTo] = useState(null);
     const [editingMessage, setEditingMessage] = useState(null);
+
+    // ── Phase 9: Message Search ───────────────────────────
+    const [jumpToMessageId, setJumpToMessageId] = useState(null);
 
     const cancelReply = useCallback(() => setReplyingTo(null), []);
     const cancelEdit = useCallback(() => setEditingMessage(null), []);
@@ -128,7 +132,7 @@ export const ChatProvider = ({ children }) => {
         setReplyingTo(null);
         // Stop typing when sending
         stopTyping();
-    }, [socket, isConnected, replyingTo]);
+    }, [socket, isConnected, replyingTo, stopTyping]);
 
     // ── Phase 8: Edit message ─────────────────────────────
     const editMessage = useCallback(async (messageId, content) => {
@@ -223,7 +227,7 @@ export const ChatProvider = ({ children }) => {
         try {
             const { data } = await api.get("/users/blocked");
             return data.users.some((u) => u.id === targetUserId);
-        } catch (error) {
+        } catch {
             return false;
         }
     }, []);
@@ -596,6 +600,9 @@ export const ChatProvider = ({ children }) => {
                 editMessage,
                 deleteMessageForSelf,
                 deleteMessageForEveryone,
+                // Phase 9: Message Search
+                jumpToMessageId,
+                setJumpToMessageId,
             }}
         >
             {children}

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
@@ -16,6 +17,7 @@ export const SocketProvider = ({ children }) => {
     const { user, isAuthenticated } = useAuth();
     const [onlineUsers, setOnlineUsers] = useState(new Set());
     const [isConnected, setIsConnected] = useState(false);
+    const [socketInstance, setSocketInstance] = useState(null);
     const socketRef = useRef(null);
 
     useEffect(() => {
@@ -24,7 +26,9 @@ export const SocketProvider = ({ children }) => {
             if (socketRef.current) {
                 socketRef.current.disconnect();
                 socketRef.current = null;
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setIsConnected(false);
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setOnlineUsers(new Set());
             }
             return;
@@ -42,6 +46,7 @@ export const SocketProvider = ({ children }) => {
         });
 
         socketRef.current = socket;
+        setSocketInstance(socket);
 
         socket.on("connect", () => {
             console.log("🔌 Socket connected:", socket.id);
@@ -91,7 +96,7 @@ export const SocketProvider = ({ children }) => {
     return (
         <SocketContext.Provider
             value={{
-                socket: socketRef.current,
+                socket: socketInstance,
                 isConnected,
                 onlineUsers,
                 isUserOnline,

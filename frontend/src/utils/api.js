@@ -31,4 +31,6 @@ api.interceptors.response.use(
     }
 );
 
+export const searchMessagesAPI = (params) => api.get("/messages/search/all", { params });
+
 export default api;

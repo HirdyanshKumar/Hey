@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
@@ -30,7 +31,7 @@ export const AuthProvider = ({ children }) => {
             }
             const { data } = await api.get("/auth/me");
             setUser(data.user);
-        } catch (error) {
+        } catch {
             localStorage.removeItem("token");
             setUser(null);
         } finally {
@@ -73,7 +74,7 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await api.post("/auth/logout");
-        } catch (error) {
+        } catch {
             // Continue with local logout even if API call fails
         } finally {
             localStorage.removeItem("token");

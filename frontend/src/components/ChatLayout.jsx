@@ -1,4 +1,3 @@
-import { useState } from "react";
 import Sidebar from "./Sidebar";
 import WelcomeScreen from "./WelcomeScreen";
 import ChatWindow from "./ChatWindow";

@@ -217,4 +217,62 @@ const deleteForEveryone = async (req, res) => {
     }
 };
 
-module.exports = { getMessages, editMessage, deleteForSelf, deleteForEveryone };
+// GET /api/messages/search/all — Search messages across all user's conversations
+const searchMessages = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { q, senderId, startDate, endDate, limit = 50 } = req.query;
+
+        if (!q || !q.trim()) {
+            return res.status(400).json({ error: "Search query is required." });
+        }
+
+        // 1. Get all conversation IDs the user is part of
+        const userParticipants = await prisma.conversationParticipant.findMany({
+            where: { userId },
+            select: { conversationId: true },
+        });
+
+        const conversationIds = userParticipants.map((p) => p.conversationId);
+
+        if (conversationIds.length === 0) {
+            return res.status(200).json({ messages: [] });
+        }
+
+        // 2. Build where clause
+        const whereClause = {
+            conversationId: { in: conversationIds },
+            content: { contains: q.trim(), mode: "insensitive" },
+            isDeleted: false,
+            NOT: { deletedByUserIds: { has: userId } },
+        };
+
+        if (senderId) {
+            whereClause.senderId = senderId;
+        }
+
+        if (startDate || endDate) {
+            whereClause.createdAt = {};
+            if (startDate) whereClause.createdAt.gte = new Date(startDate);
+            if (endDate) whereClause.createdAt.lte = new Date(endDate);
+        }
+
+        // 3. Query messages
+        const messages = await prisma.message.findMany({
+            where: whereClause,
+            orderBy: { createdAt: "desc" },
+            take: parseInt(limit, 10),
+            include: {
+                sender: { select: { id: true, displayName: true, avatarUrl: true } },
+                conversation: { select: { id: true, name: true, isGroup: true, avatarUrl: true, participants: { select: { user: { select: { id: true, displayName: true, avatarUrl: true } } } } } },
+            },
+        });
+
+        return res.status(200).json({ messages });
+    } catch (error) {
+        console.error("searchMessages error:", error);
+        return res.status(500).json({ error: "Failed to search messages." });
+    }
+};
+
+module.exports = { getMessages, editMessage, deleteForSelf, deleteForEveryone, searchMessages };

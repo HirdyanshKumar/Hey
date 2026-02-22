@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useSocket } from "../context/SocketContext";
@@ -35,6 +35,9 @@ const ChatWindow = ({ onBack }) => {
         editMessage,
         deleteMessageForSelf,
         deleteMessageForEveryone,
+        // Phase 9
+        jumpToMessageId,
+        setJumpToMessageId,
     } = useChat();
     const { isUserOnline } = useSocket();
     const [input, setInput] = useState("");
@@ -72,6 +75,23 @@ const ChatWindow = ({ onBack }) => {
         }
     }, [editingMessage]);
 
+    // Jump to searched message
+    useEffect(() => {
+        if (jumpToMessageId) {
+            // Slight delay to allow DOM to render if we just switched conversations
+            const timer = setTimeout(() => {
+                const el = document.getElementById(`msg-${jumpToMessageId}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    el.classList.add("msg-highlight");
+                    setTimeout(() => el.classList.remove("msg-highlight"), 2000);
+                }
+                setJumpToMessageId(null);
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [jumpToMessageId, setJumpToMessageId, messages]);
+
     // Check block status when conversation changes (only for DMs)
     useEffect(() => {
         const checkBlock = async () => {
@@ -88,7 +108,7 @@ const ChatWindow = ({ onBack }) => {
             }
         };
         checkBlock();
-    }, [selectedConversation?.id, user?.id, checkBlockStatus]);
+    }, [selectedConversation?.id, user?.id, checkBlockStatus, selectedConversation]);
 
     // Close menus on outside click
     useEffect(() => {
@@ -154,7 +174,7 @@ const ChatWindow = ({ onBack }) => {
                     toast.success("User blocked");
                 }
             }
-        } catch (error) {
+        } catch {
             toast.error("Action failed");
         } finally {
             setBlockLoading(false);

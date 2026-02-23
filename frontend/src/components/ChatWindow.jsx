@@ -4,9 +4,11 @@ import { useChat } from "../context/ChatContext";
 import { useSocket } from "../context/SocketContext";
 import {
     Send, ArrowLeft, Smile, MoreVertical, ShieldOff, ShieldAlert,
-    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight, Paperclip, FileImage, FileVideo, Expand, Loader2
+    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight, Paperclip, FileImage, FileVideo, Expand, Loader2, Mic
 } from "lucide-react";
 import GroupInfoPanel from "./GroupInfoPanel";
+import VoiceRecorder from "./VoiceRecorder";
+import VoiceMessage from "./VoiceMessage";
 import toast from "react-hot-toast";
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -56,6 +58,9 @@ const ChatWindow = ({ onBack }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [lightboxMedia, setLightboxMedia] = useState(null);
     const fileInputRef = useRef(null);
+
+    // ── Phase 11: Voice Notes states ──────────────────────
+    const [isVoiceRecording, setIsVoiceRecording] = useState(false);
 
     // ── Context menu state ────────────────────────────────
     const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
@@ -171,6 +176,28 @@ const ChatWindow = ({ onBack }) => {
         } catch (error) {
             toast.error("Failed to send message");
             console.error("handleSend error:", error);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleVoiceSend = async (audioFile) => {
+        if (isBlocked || isUploading) return;
+
+        setIsVoiceRecording(false);
+        setIsUploading(true);
+        try {
+            const { uploadMediaAPI } = await import("../utils/api");
+            const formData = new FormData();
+            formData.append("media", audioFile);
+
+            const { data } = await uploadMediaAPI(formData);
+            const attachment = data; // { fileUrl, fileType: "audio", fileName, fileSize }
+
+            sendMessage("", attachment);
+        } catch (error) {
+            toast.error("Failed to send voice note");
+            console.error("handleVoiceSend error:", error);
         } finally {
             setIsUploading(false);
         }
@@ -576,17 +603,23 @@ const ChatWindow = ({ onBack }) => {
 
                                             {/* Media Rendering */}
                                             {msg.fileUrl && !msg.isDeleted && (
-                                                <div
-                                                    className="mb-1 rounded-lg overflow-hidden cursor-pointer"
-                                                    onClick={() => setLightboxMedia(msg)}
-                                                    style={{ maxWidth: "250px", maxHeight: "250px" }}
-                                                >
-                                                    {msg.fileType === "video" ? (
-                                                        <video src={msg.fileUrl} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <img src={msg.fileUrl} alt={msg.fileName || "attachment"} className="w-full h-full object-cover" />
-                                                    )}
-                                                </div>
+                                                msg.fileType === "audio" ? (
+                                                    <div className="mb-1 mt-1">
+                                                        <VoiceMessage url={msg.fileUrl} isMine={isMine} />
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        className="mb-1 rounded-lg overflow-hidden cursor-pointer"
+                                                        onClick={() => setLightboxMedia(msg)}
+                                                        style={{ maxWidth: "250px", maxHeight: "250px" }}
+                                                    >
+                                                        {msg.fileType === "video" ? (
+                                                            <video src={msg.fileUrl} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <img src={msg.fileUrl} alt={msg.fileName || "attachment"} className="w-full h-full object-cover" />
+                                                        )}
+                                                    </div>
+                                                )
                                             )}
 
                                             {/* Message content or deleted placeholder */}
@@ -761,65 +794,83 @@ const ChatWindow = ({ onBack }) => {
             )}
 
             {/* ── Message Input ──────────────────────────────── */}
-            <form
-                onSubmit={handleSend}
+            <div
                 className="flex items-center gap-3 px-4 py-3 border-t"
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-secondary)" }}
             >
-                <button
-                    type="button"
-                    className="p-2 rounded-lg transition-fast flex-shrink-0 hover:bg-black/10"
-                    style={{ color: "var(--text-muted)" }}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isBlocked || editingMessage || isUploading}
-                >
-                    <Paperclip size={20} />
-                </button>
-                <input
-                    type="file"
-                    accept="image/*,video/*"
-                    hidden
-                    ref={fileInputRef}
-                    onChange={handleFileSelect}
-                />
+                {isVoiceRecording ? (
+                    <VoiceRecorder
+                        onSend={handleVoiceSend}
+                        onCancel={() => setIsVoiceRecording(false)}
+                    />
+                ) : (
+                    <form onSubmit={handleSend} className="flex flex-1 items-center gap-3">
+                        <button
+                            type="button"
+                            className="p-2 rounded-lg transition-fast flex-shrink-0 hover:bg-black/10"
+                            style={{ color: "var(--text-muted)" }}
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isBlocked || editingMessage || isUploading}
+                        >
+                            <Paperclip size={20} />
+                        </button>
+                        <input
+                            type="file"
+                            accept="image/*,video/*"
+                            hidden
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                        />
 
-                <button
-                    type="button"
-                    className="p-2 rounded-lg transition-fast flex-shrink-0"
-                    style={{ color: "var(--text-muted)" }}
-                >
-                    <Smile size={20} />
-                </button>
+                        <button
+                            type="button"
+                            className="p-2 rounded-lg transition-fast flex-shrink-0"
+                            style={{ color: "var(--text-muted)" }}
+                            disabled={isBlocked || editingMessage || isUploading}
+                            onClick={() => setIsVoiceRecording(true)}
+                        >
+                            <Mic size={20} />
+                        </button>
 
-                <input
-                    ref={inputRef}
-                    type="text"
-                    value={input}
-                    onChange={handleInputChange}
-                    placeholder={isBlocked ? "You blocked this user" : editingMessage ? "Edit your message..." : "Type a message..."}
-                    disabled={isBlocked}
-                    className="flex-1 py-2.5 px-4 rounded-xl text-sm outline-none"
-                    style={{
-                        backgroundColor: "var(--bg-input)",
-                        color: "var(--text-primary)",
-                        border: editingMessage ? "1px solid var(--accent)" : "1px solid var(--border)",
-                        opacity: isBlocked ? 0.5 : 1,
-                    }}
-                />
+                        <button
+                            type="button"
+                            className="p-2 rounded-lg transition-fast flex-shrink-0"
+                            style={{ color: "var(--text-muted)" }}
+                        >
+                            <Smile size={20} />
+                        </button>
 
-                <button
-                    type="submit"
-                    disabled={(!input.trim() && !selectedFile) || isBlocked || isUploading}
-                    className="p-2.5 rounded-xl transition-fast flex-shrink-0"
-                    style={{
-                        backgroundColor: (input.trim() || selectedFile) && !isBlocked ? "var(--accent)" : "var(--bg-input)",
-                        color: (input.trim() || selectedFile) && !isBlocked ? "#fff" : "var(--text-muted)",
-                        cursor: (input.trim() || selectedFile) && !isBlocked && !isUploading ? "pointer" : "default",
-                    }}
-                >
-                    {isUploading ? <Loader2 size={18} className="animate-spin" /> : editingMessage ? <Check size={18} /> : <Send size={18} />}
-                </button>
-            </form>
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={input}
+                            onChange={handleInputChange}
+                            placeholder={isBlocked ? "You blocked this user" : editingMessage ? "Edit your message..." : "Type a message..."}
+                            disabled={isBlocked}
+                            className="flex-1 py-2.5 px-4 rounded-xl text-sm outline-none"
+                            style={{
+                                backgroundColor: "var(--bg-input)",
+                                color: "var(--text-primary)",
+                                border: editingMessage ? "1px solid var(--accent)" : "1px solid var(--border)",
+                                opacity: isBlocked ? 0.5 : 1,
+                            }}
+                        />
+
+                        <button
+                            type="submit"
+                            disabled={(!input.trim() && !selectedFile) || isBlocked || isUploading}
+                            className="p-2.5 rounded-xl transition-fast flex-shrink-0"
+                            style={{
+                                backgroundColor: (input.trim() || selectedFile) && !isBlocked ? "var(--accent)" : "var(--bg-input)",
+                                color: (input.trim() || selectedFile) && !isBlocked ? "#fff" : "var(--text-muted)",
+                                cursor: (input.trim() || selectedFile) && !isBlocked && !isUploading ? "pointer" : "default",
+                            }}
+                        >
+                            {isUploading ? <Loader2 size={18} className="animate-spin" /> : editingMessage ? <Check size={18} /> : <Send size={18} />}
+                        </button>
+                    </form>
+                )}
+            </div>
 
             {/* Group Info Panel */}
             {showGroupInfo && isGroup && (

@@ -4,7 +4,7 @@ import { useChat } from "../context/ChatContext";
 import { useSocket } from "../context/SocketContext";
 import {
     Send, ArrowLeft, Smile, MoreVertical, ShieldOff, ShieldAlert,
-    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight
+    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight, Paperclip, FileImage, FileVideo, Expand, Loader2
 } from "lucide-react";
 import GroupInfoPanel from "./GroupInfoPanel";
 import toast from "react-hot-toast";
@@ -49,6 +49,13 @@ const ChatWindow = ({ onBack }) => {
     const menuRef = useRef(null);
     const [showGroupInfo, setShowGroupInfo] = useState(false);
     const isGroup = selectedConversation?.isGroup;
+
+    // ── Phase 10: Media states ────────────────────────────
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [filePreview, setFilePreview] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [lightboxMedia, setLightboxMedia] = useState(null);
+    const fileInputRef = useRef(null);
 
     // ── Context menu state ────────────────────────────────
     const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
@@ -132,9 +139,11 @@ const ChatWindow = ({ onBack }) => {
         return () => area?.removeEventListener("scroll", handleScroll);
     }, []);
 
-    const handleSend = (e) => {
+    const handleSend = async (e) => {
         e.preventDefault();
-        if (!input.trim() || isBlocked) return;
+
+        const hasContent = input.trim() || selectedFile;
+        if (!hasContent || isBlocked || isUploading) return;
 
         if (editingMessage) {
             editMessage(editingMessage.id, input.trim());
@@ -142,8 +151,52 @@ const ChatWindow = ({ onBack }) => {
             return;
         }
 
-        sendMessage(input.trim());
-        setInput("");
+        try {
+            let attachment = null;
+            if (selectedFile) {
+                setIsUploading(true);
+                const { uploadMediaAPI } = await import("../utils/api");
+                const formData = new FormData();
+                formData.append("media", selectedFile);
+
+                const { data } = await uploadMediaAPI(formData);
+                attachment = data; // { fileUrl, fileType, fileName, fileSize }
+            }
+
+            sendMessage(input.trim(), attachment);
+
+            // Clear input and file
+            setInput("");
+            clearSelectedFile();
+        } catch (error) {
+            toast.error("Failed to send message");
+            console.error("handleSend error:", error);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleFileSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 50 * 1024 * 1024) {
+            toast.error("File size must be less than 50MB");
+            return;
+        }
+
+        setSelectedFile(file);
+
+        // Create preview
+        const reader = new FileReader();
+        reader.onload = () => setFilePreview(reader.result);
+        reader.readAsDataURL(file);
+    };
+
+    const clearSelectedFile = () => {
+        setSelectedFile(null);
+        setFilePreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
     const handleInputChange = (e) => {
@@ -515,9 +568,24 @@ const ChatWindow = ({ onBack }) => {
                                                                 ? "🚫 This message was deleted"
                                                                 : msg.replyTo.content?.length > 60
                                                                     ? msg.replyTo.content.substring(0, 60) + "..."
-                                                                    : msg.replyTo.content}
+                                                                    : msg.replyTo.content || "Attached Media"}
                                                         </span>
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {/* Media Rendering */}
+                                            {msg.fileUrl && !msg.isDeleted && (
+                                                <div
+                                                    className="mb-1 rounded-lg overflow-hidden cursor-pointer"
+                                                    onClick={() => setLightboxMedia(msg)}
+                                                    style={{ maxWidth: "250px", maxHeight: "250px" }}
+                                                >
+                                                    {msg.fileType === "video" ? (
+                                                        <video src={msg.fileUrl} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <img src={msg.fileUrl} alt={msg.fileName || "attachment"} className="w-full h-full object-cover" />
+                                                    )}
                                                 </div>
                                             )}
 
@@ -526,9 +594,9 @@ const ChatWindow = ({ onBack }) => {
                                                 <p className="msg-deleted-placeholder">
                                                     🚫 This message was deleted
                                                 </p>
-                                            ) : (
+                                            ) : msg.content ? (
                                                 <p className="text-sm" style={{ lineHeight: "1.45" }}>{msg.content}</p>
-                                            )}
+                                            ) : null}
 
                                             {/* Meta: time + edited + receipt */}
                                             <div className="chat-bubble-meta">
@@ -625,13 +693,35 @@ const ChatWindow = ({ onBack }) => {
                             <span className="reply-preview-bar-text">
                                 {replyingTo.content?.length > 80
                                     ? replyingTo.content.substring(0, 80) + "..."
-                                    : replyingTo.content}
+                                    : replyingTo.content || "Attached Media"}
                             </span>
                         </div>
                     </div>
                     <button className="reply-preview-bar-close" onClick={cancelReply}>
                         <X size={16} />
                     </button>
+                </div>
+            )}
+
+            {/* ── Lightbox ───────────────────────────────────── */}
+            {lightboxMedia && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+                    onClick={() => setLightboxMedia(null)}
+                >
+                    <button
+                        className="absolute top-4 right-4 text-white hover:text-gray-300 p-2"
+                        onClick={() => setLightboxMedia(null)}
+                    >
+                        <X size={24} />
+                    </button>
+                    <div className="max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                        {lightboxMedia.fileType === "video" ? (
+                            <video src={lightboxMedia.fileUrl} controls autoPlay className="max-w-full max-h-[90vh] rounded" />
+                        ) : (
+                            <img src={lightboxMedia.fileUrl} alt="expanded media" className="max-w-full max-h-[90vh] rounded object-contain" />
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -648,12 +738,51 @@ const ChatWindow = ({ onBack }) => {
                 </div>
             )}
 
+            {/* ── File Preview Pre-Send ──────────────────────── */}
+            {filePreview && (
+                <div className="px-4 py-2 border-t" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-secondary)" }}>
+                    <div className="relative inline-block">
+                        {selectedFile?.type.startsWith("video/") ? (
+                            <div className="w-20 h-20 rounded-lg bg-black flex items-center justify-center relative overflow-hidden">
+                                <FileVideo size={32} className="text-gray-400 opacity-50 absolute" />
+                                <video src={filePreview} className="w-full h-full object-cover z-10" />
+                            </div>
+                        ) : (
+                            <img src={filePreview} alt="preview" className="w-20 h-20 rounded-lg object-cover" />
+                        )}
+                        <button
+                            onClick={clearSelectedFile}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 z-20"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* ── Message Input ──────────────────────────────── */}
             <form
                 onSubmit={handleSend}
                 className="flex items-center gap-3 px-4 py-3 border-t"
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-secondary)" }}
             >
+                <button
+                    type="button"
+                    className="p-2 rounded-lg transition-fast flex-shrink-0 hover:bg-black/10"
+                    style={{ color: "var(--text-muted)" }}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isBlocked || editingMessage || isUploading}
+                >
+                    <Paperclip size={20} />
+                </button>
+                <input
+                    type="file"
+                    accept="image/*,video/*"
+                    hidden
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                />
+
                 <button
                     type="button"
                     className="p-2 rounded-lg transition-fast flex-shrink-0"
@@ -680,15 +809,15 @@ const ChatWindow = ({ onBack }) => {
 
                 <button
                     type="submit"
-                    disabled={!input.trim() || isBlocked}
+                    disabled={(!input.trim() && !selectedFile) || isBlocked || isUploading}
                     className="p-2.5 rounded-xl transition-fast flex-shrink-0"
                     style={{
-                        backgroundColor: input.trim() && !isBlocked ? "var(--accent)" : "var(--bg-input)",
-                        color: input.trim() && !isBlocked ? "#fff" : "var(--text-muted)",
-                        cursor: input.trim() && !isBlocked ? "pointer" : "default",
+                        backgroundColor: (input.trim() || selectedFile) && !isBlocked ? "var(--accent)" : "var(--bg-input)",
+                        color: (input.trim() || selectedFile) && !isBlocked ? "#fff" : "var(--text-muted)",
+                        cursor: (input.trim() || selectedFile) && !isBlocked && !isUploading ? "pointer" : "default",
                     }}
                 >
-                    {editingMessage ? <Check size={18} /> : <Send size={18} />}
+                    {isUploading ? <Loader2 size={18} className="animate-spin" /> : editingMessage ? <Check size={18} /> : <Send size={18} />}
                 </button>
             </form>
 

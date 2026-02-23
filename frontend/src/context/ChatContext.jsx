@@ -113,8 +113,8 @@ export const ChatProvider = ({ children }) => {
         }
     }, [selectConversation, socket, isConnected]);
 
-    // Send a message via Socket.IO (supports replyToId)
-    const sendMessage = useCallback((content) => {
+    // Send a message via Socket.IO (supports replyToId and media attachments)
+    const sendMessage = useCallback((content, attachment = null) => {
         if (!socket || !isConnected || !selectedConvIdRef.current) return;
 
         const payload = {
@@ -124,6 +124,13 @@ export const ChatProvider = ({ children }) => {
 
         if (replyingTo) {
             payload.replyToId = replyingTo.id;
+        }
+
+        if (attachment) {
+            payload.fileUrl = attachment.fileUrl;
+            payload.fileType = attachment.fileType;
+            payload.fileName = attachment.fileName;
+            payload.fileSize = attachment.fileSize;
         }
 
         socket.emit("send:message", payload);

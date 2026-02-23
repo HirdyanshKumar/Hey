@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const cloudinary = require("../config/cloudinary");
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;     // 15 minutes
 const DELETE_WINDOW_MS = 60 * 60 * 1000;   // 1 hour
@@ -221,10 +222,12 @@ const deleteForEveryone = async (req, res) => {
 const searchMessages = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { q, senderId, startDate, endDate, limit = 50 } = req.query;
+        const { q, senderId, startDate, endDate, limit = 50, hasMedia } = req.query;
 
-        if (!q || !q.trim()) {
-            return res.status(400).json({ error: "Search query is required." });
+        // If filtering by media ONLY, we might not have a query.
+        // But the previous requirement was "q is required". We'll allow empty q if hasMedia is true.
+        if (!q?.trim() && !hasMedia) {
+            return res.status(400).json({ error: "Search query or media filter is required." });
         }
 
         // 1. Get all conversation IDs the user is part of
@@ -242,10 +245,17 @@ const searchMessages = async (req, res) => {
         // 2. Build where clause
         const whereClause = {
             conversationId: { in: conversationIds },
-            content: { contains: q.trim(), mode: "insensitive" },
             isDeleted: false,
             NOT: { deletedByUserIds: { has: userId } },
         };
+
+        if (q?.trim()) {
+            whereClause.content = { contains: q.trim(), mode: "insensitive" };
+        }
+
+        if (hasMedia === "true") {
+            whereClause.fileUrl = { not: null };
+        }
 
         if (senderId) {
             whereClause.senderId = senderId;
@@ -275,4 +285,34 @@ const searchMessages = async (req, res) => {
     }
 };
 
-module.exports = { getMessages, editMessage, deleteForSelf, deleteForEveryone, searchMessages };
+// POST /api/messages/upload — Upload media attachment
+const uploadMedia = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file provided." });
+        }
+
+        const b64 = Buffer.from(req.file.buffer).toString("base64");
+        const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+
+        const result = await cloudinary.uploader.upload(dataURI, {
+            resource_type: "auto",
+            folder: "chat_app_media",
+        });
+
+        // result.resource_type is usually 'image' or 'video'
+        const fileType = result.resource_type === "video" ? "video" : "image";
+
+        return res.status(200).json({
+            fileUrl: result.secure_url,
+            fileType,
+            fileName: req.file.originalname,
+            fileSize: req.file.size
+        });
+    } catch (error) {
+        console.error("uploadMedia error:", error);
+        return res.status(500).json({ error: "Failed to upload media." });
+    }
+};
+
+module.exports = { getMessages, editMessage, deleteForSelf, deleteForEveryone, searchMessages, uploadMedia };

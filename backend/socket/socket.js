@@ -176,9 +176,9 @@ const initializeSocket = (io) => {
         });
 
         // ── Send a message ────────────────────────────────
-        socket.on("send:message", async ({ conversationId, content, replyToId }) => {
+        socket.on("send:message", async ({ conversationId, content, replyToId, fileUrl, fileType, fileName, fileSize }) => {
             try {
-                if (!content?.trim()) return;
+                if (!content?.trim() && !fileUrl) return;
 
                 // Verify user is a participant
                 const participant = await prisma.conversationParticipant.findFirst({
@@ -235,9 +235,16 @@ const initializeSocket = (io) => {
                 const messageData = {
                     conversationId,
                     senderId: userId,
-                    content: content.trim(),
+                    content: content?.trim() || null,
                     status: initialStatus,
                 };
+
+                if (fileUrl) {
+                    messageData.fileUrl = fileUrl;
+                    messageData.fileType = fileType;
+                    messageData.fileName = fileName;
+                    messageData.fileSize = fileSize;
+                }
 
                 // Add replyToId if provided
                 if (replyToId) {

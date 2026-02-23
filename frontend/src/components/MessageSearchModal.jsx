@@ -11,6 +11,7 @@ const MessageSearchModal = ({ onClose }) => {
     // Optional filters
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
+    const [hasMedia, setHasMedia] = useState(false);
 
     const { selectConversation, setJumpToMessageId } = useChat();
 
@@ -26,16 +27,18 @@ const MessageSearchModal = ({ onClose }) => {
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [query, startDate, endDate, performSearch]);
+    }, [query, startDate, endDate, hasMedia, performSearch]);
 
     const performSearch = useCallback(async () => {
-        if (!query.trim()) return;
+        if (!query.trim() && !hasMedia) return;
 
         setSearching(true);
         try {
-            const params = { q: query.trim() };
+            const params = {};
+            if (query.trim()) params.q = query.trim();
             if (startDate) params.startDate = new Date(startDate).toISOString();
             if (endDate) params.endDate = new Date(endDate).toISOString();
+            if (hasMedia) params.hasMedia = "true";
 
             const { data } = await searchMessagesAPI(params);
             setResults(data.messages || []);
@@ -44,7 +47,7 @@ const MessageSearchModal = ({ onClose }) => {
         } finally {
             setSearching(false);
         }
-    }, [query, startDate, endDate]);
+    }, [query, startDate, endDate, hasMedia]);
 
     const handleJumpToMessage = async (msg) => {
         try {
@@ -103,33 +106,46 @@ const MessageSearchModal = ({ onClose }) => {
                 </div>
 
                 {/* Filters Row */}
-                <div className="flex gap-2 mb-3">
-                    <div className="flex-1 flex flex-col">
-                        <label className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>From Date</label>
-                        <div className="flex items-center border rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
-                            <Calendar size={14} style={{ color: "var(--text-muted)", marginRight: '6px' }} />
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="bg-transparent border-none outline-none text-xs flex-1"
-                                style={{ color: "var(--text-primary)" }}
-                            />
+                <div className="flex flex-col gap-2 mb-3">
+                    <div className="flex gap-2">
+                        <div className="flex-1 flex flex-col">
+                            <label className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>From Date</label>
+                            <div className="flex items-center border rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
+                                <Calendar size={14} style={{ color: "var(--text-muted)", marginRight: '6px' }} />
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="bg-transparent border-none outline-none text-xs flex-1"
+                                    style={{ color: "var(--text-primary)" }}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex-1 flex flex-col">
+                            <label className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>To Date</label>
+                            <div className="flex items-center border rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
+                                <Calendar size={14} style={{ color: "var(--text-muted)", marginRight: '6px' }} />
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="bg-transparent border-none outline-none text-xs flex-1"
+                                    style={{ color: "var(--text-primary)" }}
+                                />
+                            </div>
                         </div>
                     </div>
-                    <div className="flex-1 flex flex-col">
-                        <label className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>To Date</label>
-                        <div className="flex items-center border rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
-                            <Calendar size={14} style={{ color: "var(--text-muted)", marginRight: '6px' }} />
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-transparent border-none outline-none text-xs flex-1"
-                                style={{ color: "var(--text-primary)" }}
-                            />
-                        </div>
-                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer mt-1 w-max">
+                        <input
+                            type="checkbox"
+                            checked={hasMedia}
+                            onChange={(e) => setHasMedia(e.target.checked)}
+                            className="w-4 h-4 rounded text-blue-500"
+                        />
+                        <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                            Only show messages with media
+                        </span>
+                    </label>
                 </div>
 
                 {/* Results List */}
@@ -179,7 +195,7 @@ const MessageSearchModal = ({ onClose }) => {
                                         </span>
                                     </div>
                                     <p className="text-sm line-clamp-2" style={{ color: "var(--text-secondary)" }}>
-                                        {msg.content}
+                                        {msg.content || (msg.fileType === "video" ? "📹 Video attachment" : "🖼️ Image attachment")}
                                     </p>
                                 </button>
                             ))}

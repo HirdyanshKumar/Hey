@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/prisma");
+const { getAIBotUser, generateAIResponse } = require("../services/ai.service");
 
 // Map<userId, Set<socketId>> — supports multiple tabs/windows
 const onlineUsers = new Map();
@@ -284,6 +285,72 @@ const initializeSocket = (io) => {
                     conversationId,
                     userId,
                 });
+
+                // --- AI BOT INTEGRATION ---
+                const aiBot = await getAIBotUser();
+                const isAIBotInConv = otherParticipants.some(p => p.userId === aiBot.id);
+
+                if (isAIBotInConv && userId !== aiBot.id) {
+                    // Simulate bot typing
+                    io.to(`conv:${conversationId}`).emit("typing:start", {
+                        conversationId,
+                        userId: aiBot.id,
+                    });
+
+                    setImmediate(async () => {
+                        try {
+                            const history = await prisma.message.findMany({
+                                where: { conversationId, isDeleted: false },
+                                orderBy: { createdAt: "desc" },
+                                take: 20
+                            });
+                            history.reverse();
+
+                            // Remove the just-sent message to act as context
+                            const previousMessages = history.slice(0, -1);
+                            const formattedHistory = previousMessages.map(m => ({
+                                isUser: m.senderId !== aiBot.id,
+                                content: m.content || "[Media]"
+                            }));
+
+                            const aiReplyContent = await generateAIResponse(formattedHistory, content || "[Media attachment sent]");
+
+                            const aiMessage = await prisma.message.create({
+                                data: {
+                                    conversationId,
+                                    senderId: aiBot.id,
+                                    content: aiReplyContent,
+                                    status: "delivered",
+                                },
+                                include: {
+                                    sender: { select: { id: true, displayName: true, avatarUrl: true } },
+                                },
+                            });
+
+                            await prisma.conversation.update({
+                                where: { id: conversationId },
+                                data: { updatedAt: new Date() },
+                            });
+
+                            io.to(`conv:${conversationId}`).emit("new:message", {
+                                conversationId,
+                                message: aiMessage,
+                            });
+
+                            io.to(`conv:${conversationId}`).emit("typing:stop", {
+                                conversationId,
+                                userId: aiBot.id,
+                            });
+                        } catch (aiErr) {
+                            console.error("AI Reply Error:", aiErr);
+                            io.to(`conv:${conversationId}`).emit("typing:stop", {
+                                conversationId,
+                                userId: aiBot.id,
+                            });
+                        }
+                    });
+                }
+                // --- END AI BOT INTEGRATION ---
 
                 console.log(`💬 Message from ${userId} in conv:${conversationId} [${initialStatus}]`);
             } catch (err) {

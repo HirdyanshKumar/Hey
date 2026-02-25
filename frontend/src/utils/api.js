@@ -33,4 +33,7 @@ api.interceptors.response.use(
 
 export const searchMessagesAPI = (params) => api.get("/messages/search/all", { params });
 
+export const createAIBotConversationAPI = () => api.post("/ai/bot/conversation");
+export const getSmartRepliesAPI = (conversationId) => api.get(`/ai/smart-replies/${conversationId}`);
+
 export default api;

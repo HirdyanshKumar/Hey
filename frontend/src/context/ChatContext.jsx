@@ -367,6 +367,31 @@ export const ChatProvider = ({ children }) => {
         }
     }, []);
 
+    // ── Phase 13: Start AI Chat ───────────────────────────
+    const startAIChat = useCallback(async () => {
+        try {
+            const { createAIBotConversationAPI } = await import("../utils/api");
+            const { data } = await createAIBotConversationAPI();
+            const conv = data.conversation;
+
+            setConversations((prev) => {
+                const exists = prev.find((c) => c.id === conv.id);
+                if (exists) return prev;
+                return [conv, ...prev];
+            });
+
+            await selectConversation(conv.id);
+
+            if (socket && isConnected) {
+                socket.emit("join:conversation", { conversationId: conv.id });
+            }
+            return conv;
+        } catch (error) {
+            console.error("Failed to start AI Chat:", error);
+            throw error;
+        }
+    }, [selectConversation, socket, isConnected]);
+
     // Fetch conversations on mount
     useEffect(() => {
         fetchConversations();
@@ -597,6 +622,7 @@ export const ChatProvider = ({ children }) => {
                 demoteMember,
                 leaveGroup,
                 deleteGroup,
+                startAIChat,
                 // Phase 8: Edit, Delete, Reply
                 replyingTo,
                 setReplyingTo,

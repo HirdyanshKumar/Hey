@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import { useChat } from "../context/ChatContext";
-import { Search, Settings, Plus, X, MessageCircle, Loader2, Users, SearchIcon } from "lucide-react";
+import { Search, Settings, Plus, X, MessageCircle, Loader2, Users, SearchIcon, Bot } from "lucide-react";
 import api from "../utils/api";
 import MessageSearchModal from "./MessageSearchModal";
 
@@ -24,6 +24,7 @@ const Sidebar = () => {
         selectConversation,
         createConversation,
         createGroup,
+        startAIChat,
     } = useChat();
     const navigate = useNavigate();
 
@@ -212,6 +213,16 @@ const Sidebar = () => {
                         title="New Chat"
                     >
                         <Plus size={18} />
+                    </button>
+                    <button
+                        className="p-2 rounded-lg transition-fast"
+                        style={{ color: "var(--text-secondary)" }}
+                        onClick={startAIChat}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                        title="Chat with AI"
+                    >
+                        <Bot size={18} />
                     </button>
                     <button
                         className="p-2 rounded-lg transition-fast"

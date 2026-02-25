@@ -4,7 +4,7 @@ import { useChat } from "../context/ChatContext";
 import { useSocket } from "../context/SocketContext";
 import {
     Send, ArrowLeft, Smile, MoreVertical, ShieldOff, ShieldAlert,
-    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight, Paperclip, FileImage, FileVideo, Expand, Loader2, Mic
+    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight, Paperclip, FileImage, FileVideo, Expand, Loader2, Mic, Sparkles
 } from "lucide-react";
 import GroupInfoPanel from "./GroupInfoPanel";
 import VoiceRecorder from "./VoiceRecorder";
@@ -61,6 +61,10 @@ const ChatWindow = ({ onBack }) => {
 
     // ── Phase 11: Voice Notes states ──────────────────────
     const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+
+    // ── Phase 13: AI Chatbot & Smart Replies ──────────────
+    const [smartReplies, setSmartReplies] = useState([]);
+    const [loadingReplies, setLoadingReplies] = useState(false);
 
     // ── Context menu state ────────────────────────────────
     const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
@@ -143,6 +147,41 @@ const ChatWindow = ({ onBack }) => {
         area?.addEventListener("scroll", handleScroll);
         return () => area?.removeEventListener("scroll", handleScroll);
     }, []);
+
+    // ── Phase 13: Fetch Smart Replies ─────────────────────
+    useEffect(() => {
+        const fetchSmartReplies = async () => {
+            if (!selectedConversation || messages.length === 0) {
+                setSmartReplies([]);
+                return;
+            }
+            const lastMessage = messages[messages.length - 1];
+            const isMine = lastMessage.sender?.id === user?.id || lastMessage.senderId === user?.id;
+
+            if (isMine) {
+                setSmartReplies([]);
+                return;
+            }
+
+            setLoadingReplies(true);
+            try {
+                const { getSmartRepliesAPI } = await import("../utils/api");
+                const { data } = await getSmartRepliesAPI(selectedConversation.id);
+                setSmartReplies(data.replies || []);
+            } catch (err) {
+                console.error("Failed to fetch smart replies:", err);
+            } finally {
+                setLoadingReplies(false);
+            }
+        };
+
+        // Debounce fetching slightly just to not spam API when rapidly switching
+        const timer = setTimeout(() => {
+            fetchSmartReplies();
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [messages, selectedConversation, user?.id]);
 
     const handleSend = async (e) => {
         e.preventDefault();
@@ -529,6 +568,7 @@ const ChatWindow = ({ onBack }) => {
                     <div className="flex flex-col gap-1">
                         {messages.map((msg, index) => {
                             const isMine = msg.sender?.id === user?.id || msg.senderId === user?.id;
+                            const isBot = msg.sender?.displayName === "Hey AI";
                             const showAvatar =
                                 !isMine &&
                                 (index === 0 || messages[index - 1]?.sender?.id !== msg.sender?.id);
@@ -571,11 +611,12 @@ const ChatWindow = ({ onBack }) => {
                                         {/* Message bubble */}
                                         <div
                                             className={`chat-bubble ${isMine ? "chat-bubble-sent" : "chat-bubble-received"} ${msg.isDeleted ? "msg-deleted-bubble" : ""}`}
+                                            style={isBot && !isMine ? { border: "1px solid var(--accent)", boxShadow: "0 0 8px rgba(var(--accent-rgb), 0.2)" } : {}}
                                         >
                                             {/* Sender name (group only, received messages) */}
                                             {isGroup && !isMine && showAvatar && !msg.isDeleted && (
                                                 <p className="group-sender-name" style={{ color: getAvatarColor(msg.sender?.displayName) }}>
-                                                    {msg.sender?.displayName}
+                                                    {msg.sender?.displayName} {isBot && <Sparkles size={12} className="inline ml-1 text-yellow-500" />}
                                                 </p>
                                             )}
 
@@ -790,6 +831,38 @@ const ChatWindow = ({ onBack }) => {
                             <X size={14} />
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* ── Smart Replies ──────────────────────────────── */}
+            {smartReplies.length > 0 && !isVoiceRecording && !loadingReplies && (
+                <div className="px-4 py-3 flex flex-wrap gap-2 justify-end" style={{ backgroundColor: "var(--bg-chat)" }}>
+                    {smartReplies.map((reply, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => {
+                                sendMessage(reply);
+                                setSmartReplies([]);
+                            }}
+                            className="px-3 py-1.5 rounded-full text-sm font-medium transition-fast flex items-center gap-1.5"
+                            style={{
+                                backgroundColor: "var(--bg-secondary)",
+                                color: "var(--accent)",
+                                border: "1px solid var(--border)"
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = "var(--accent)";
+                                e.currentTarget.style.color = "#fff";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
+                                e.currentTarget.style.color = "var(--accent)";
+                            }}
+                        >
+                            <Sparkles size={14} />
+                            {reply}
+                        </button>
+                    ))}
                 </div>
             )}
 

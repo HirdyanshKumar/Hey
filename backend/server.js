@@ -39,11 +39,14 @@ const userRoutes = require("./routes/user.routes");
 const conversationRoutes = require("./routes/conversation.routes");
 const messageRoutes = require("./routes/message.routes");
 const groupRoutes = require("./routes/group.routes");
+const aiRoutes = require("./routes/ai.routes");
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Error handlers
 const { errorHandler, notFoundHandler } = require("./middleware/error.middleware");

@@ -36,4 +36,10 @@ export const searchMessagesAPI = (params) => api.get("/messages/search/all", { p
 export const createAIBotConversationAPI = () => api.post("/ai/bot/conversation");
 export const getSmartRepliesAPI = (conversationId) => api.get(`/ai/smart-replies/${conversationId}`);
 
+// Phase 14: AI Writing Tools & Translation
+export const summarizeConversationAPI = (conversationId) => api.post(`/ai/summarize/${conversationId}`);
+export const rephraseTextAPI = (text, mode) => api.post("/ai/rephrase", { text, mode });
+export const translateMessageAPI = (text, targetLanguage) => api.post("/ai/translate", { text, targetLanguage });
+export const updatePreferredLanguageAPI = (language) => api.put("/users/settings/preferred-language", { language });
+
 export default api;

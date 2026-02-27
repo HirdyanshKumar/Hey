@@ -1,6 +1,6 @@
 const express = require("express");
 const multer = require("multer");
-const { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers, updateReadReceiptsSetting } = require("../controllers/user.controller");
+const { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers, updateReadReceiptsSetting, updatePreferredLanguage } = require("../controllers/user.controller");
 const { authMiddleware } = require("../middleware/auth.middleware");
 
 const router = express.Router();
@@ -37,5 +37,8 @@ router.put("/avatar", upload.single("avatar"), updateAvatar);
 
 // Read receipt settings
 router.put("/settings/read-receipts", updateReadReceiptsSetting);
+
+// Phase 14: Preferred language
+router.put("/settings/preferred-language", updatePreferredLanguage);
 
 module.exports = router;

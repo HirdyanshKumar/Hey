@@ -1119,3 +1119,457 @@ a:hover {
 .msg-row {
   position: relative;
 }
+
+/* ── Phase 14: Writing Tools Modal ─────────────────── */
+.writing-tools-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: modalFadeIn 0.2s ease;
+}
+
+.writing-tools-modal {
+  width: 92%;
+  max-width: 520px;
+  max-height: 90vh;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(59, 130, 246, 0.08);
+  animation: modalSlideIn 0.25s ease;
+  overflow-y: auto;
+}
+
+.writing-tools-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.writing-tools-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.writing-tools-header-left h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.writing-tools-icon {
+  color: var(--accent);
+}
+
+.writing-tools-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.writing-tools-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.writing-tools-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 1rem;
+}
+
+.writing-tools-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.writing-tools-mode-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.writing-tools-mode-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.writing-tools-input-section {
+  margin-bottom: 1rem;
+}
+
+.writing-tools-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.writing-tools-textarea {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  line-height: 1.5;
+}
+
+.writing-tools-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.writing-tools-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.writing-tools-char-count {
+  display: block;
+  text-align: right;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.writing-tools-process-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  margin-bottom: 0.75rem;
+}
+
+.writing-tools-process-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.writing-tools-process-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.writing-tools-result {
+  padding: 0.85rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  animation: modalFadeIn 0.3s ease;
+}
+
+.writing-tools-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.writing-tools-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.writing-tools-copy-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.writing-tools-result-text {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(59, 130, 246, 0.06);
+  border-radius: 8px;
+  border-left: 3px solid var(--accent);
+}
+
+.writing-tools-use-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.writing-tools-use-btn:hover {
+  opacity: 0.88;
+}
+
+/* ── Phase 14: Chat Summary Modal ──────────────────── */
+.summary-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: modalFadeIn 0.2s ease;
+}
+
+.summary-modal {
+  width: 92%;
+  max-width: 500px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(59, 130, 246, 0.08);
+  animation: modalSlideIn 0.25s ease;
+}
+
+.summary-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.summary-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summary-modal-header-left h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.summary-modal-icon {
+  color: var(--accent);
+}
+
+.summary-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.summary-modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.summary-modal-content {
+  min-height: 100px;
+}
+
+.summary-modal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+
+.summary-modal-spinner {
+  color: var(--accent);
+}
+
+.summary-modal-loading p {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.summary-modal-loading span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.summary-modal-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+}
+
+.summary-modal-text {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.65;
+  padding: 0.85rem;
+  background: var(--bg-input);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.summary-modal-refresh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.summary-modal-refresh:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Phase 14: Message Translation ─────────────────── */
+.msg-translation {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.msg-translation-loading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.msg-translation-text {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.4;
+  margin-bottom: 3px;
+}
+
+.chat-bubble-sent .msg-translation-text {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.msg-translation-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  transition: opacity 0.2s;
+}
+
+.msg-translation-toggle:hover {
+  opacity: 0.75;
+}
+
+.chat-bubble-sent .msg-translation {
+  border-top-color: rgba(255, 255, 255, 0.15);
+}
+
+.chat-bubble-sent .msg-translation-toggle {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ── Phase 14: Profile Language Select ─────────────── */
+.profile-language-select {
+  padding: 6px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  min-width: 120px;
+}
+
+.profile-language-select:focus {
+  border-color: var(--accent);
+}
+
+.profile-language-select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}

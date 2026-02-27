@@ -19,6 +19,7 @@ model User {
   isOnline            Boolean  @default(false) @map("is_online")
   lastSeen            DateTime @default(now()) @map("last_seen")
   readReceiptsEnabled Boolean  @default(true) @map("read_receipts_enabled")
+  preferredLanguage   String   @default("en") @map("preferred_language")
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
 

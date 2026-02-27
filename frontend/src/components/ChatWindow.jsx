@@ -4,11 +4,15 @@ import { useChat } from "../context/ChatContext";
 import { useSocket } from "../context/SocketContext";
 import {
     Send, ArrowLeft, Smile, MoreVertical, ShieldOff, ShieldAlert,
-    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight, Paperclip, FileImage, FileVideo, Expand, Loader2, Mic, Sparkles
+    Check, CheckCheck, Users, Reply, Pencil, Trash2, X, CornerUpRight, Paperclip, FileImage, FileVideo, Expand, Loader2, Mic, Sparkles,
+    Wand2, FileText, Languages
 } from "lucide-react";
 import GroupInfoPanel from "./GroupInfoPanel";
 import VoiceRecorder from "./VoiceRecorder";
 import VoiceMessage from "./VoiceMessage";
+import WritingToolsModal from "./WritingToolsModal";
+import ChatSummaryModal from "./ChatSummaryModal";
+import { translateMessageAPI } from "../utils/api";
 import toast from "react-hot-toast";
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -65,6 +69,11 @@ const ChatWindow = ({ onBack }) => {
     // ── Phase 13: AI Chatbot & Smart Replies ──────────────
     const [smartReplies, setSmartReplies] = useState([]);
     const [loadingReplies, setLoadingReplies] = useState(false);
+
+    // ── Phase 14: AI Writing Tools & Translation ──────────
+    const [showWritingTools, setShowWritingTools] = useState(false);
+    const [showSummary, setShowSummary] = useState(false);
+    const [translations, setTranslations] = useState({}); // { messageId: { text, loading, visible } }
 
     // ── Context menu state ────────────────────────────────
     const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
@@ -357,6 +366,46 @@ const ChatWindow = ({ onBack }) => {
         }
     };
 
+    // ── Phase 14: Translate a message ──────────────────────
+    const handleTranslate = async (msg) => {
+        setContextMenu(null);
+        const msgId = msg.id;
+        if (translations[msgId]?.text) {
+            // Toggle visibility
+            setTranslations(prev => ({
+                ...prev,
+                [msgId]: { ...prev[msgId], visible: !prev[msgId].visible }
+            }));
+            return;
+        }
+
+        setTranslations(prev => ({
+            ...prev,
+            [msgId]: { text: "", loading: true, visible: true }
+        }));
+
+        try {
+            const targetLang = user?.preferredLanguage || "en";
+            const languageNames = {
+                en: "English", hi: "Hindi", es: "Spanish", fr: "French",
+                de: "German", ja: "Japanese", zh: "Chinese", ar: "Arabic",
+                pt: "Portuguese", ko: "Korean", ru: "Russian", it: "Italian"
+            };
+            const { data } = await translateMessageAPI(msg.content, languageNames[targetLang] || "English");
+            setTranslations(prev => ({
+                ...prev,
+                [msgId]: { text: data.translatedText, loading: false, visible: true }
+            }));
+        } catch {
+            toast.error("Translation failed");
+            setTranslations(prev => {
+                const copy = { ...prev };
+                delete copy[msgId];
+                return copy;
+            });
+        }
+    };
+
     if (!selectedConversation) return null;
 
     // Get the other participant(s) for display
@@ -517,6 +566,17 @@ const ChatWindow = ({ onBack }) => {
                                     Group Info
                                 </button>
                             )}
+                            {/* Phase 14: Summarize Chat */}
+                            <button
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
+                                style={{ color: "var(--text-primary)" }}
+                                onClick={() => { setShowSummary(true); setShowMenu(false); }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                            >
+                                <FileText size={16} />
+                                Summarize Chat
+                            </button>
                             {!isGroup && (
                                 <button
                                     className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
@@ -690,6 +750,41 @@ const ChatWindow = ({ onBack }) => {
                                                     </span>
                                                 )}
                                             </div>
+
+                                            {/* Phase 14: Translation */}
+                                            {translations[msg.id] && (
+                                                <div className="msg-translation">
+                                                    {translations[msg.id].loading ? (
+                                                        <div className="msg-translation-loading">
+                                                            <Loader2 size={12} className="animate-spin" />
+                                                            <span>Translating...</span>
+                                                        </div>
+                                                    ) : translations[msg.id].visible ? (
+                                                        <>
+                                                            <p className="msg-translation-text">{translations[msg.id].text}</p>
+                                                            <button
+                                                                className="msg-translation-toggle"
+                                                                onClick={() => setTranslations(prev => ({
+                                                                    ...prev,
+                                                                    [msg.id]: { ...prev[msg.id], visible: false }
+                                                                }))}
+                                                            >
+                                                                <Languages size={11} /> Hide translation
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            className="msg-translation-toggle"
+                                                            onClick={() => setTranslations(prev => ({
+                                                                ...prev,
+                                                                [msg.id]: { ...prev[msg.id], visible: true }
+                                                            }))}
+                                                        >
+                                                            <Languages size={11} /> Show translation
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -729,6 +824,14 @@ const ChatWindow = ({ onBack }) => {
                             <Reply size={15} />
                             Reply
                         </button>
+
+                        {/* Phase 14: Translate */}
+                        {contextMenu.message.content && (
+                            <button className="msg-context-item" onClick={() => handleTranslate(contextMenu.message)}>
+                                <Languages size={15} />
+                                {translations[contextMenu.message.id]?.text ? "Toggle Translation" : "Translate"}
+                            </button>
+                        )}
 
                         {/* Edit (own messages, within window) */}
                         {canEdit(contextMenu.message) && (
@@ -905,6 +1008,18 @@ const ChatWindow = ({ onBack }) => {
                             <Mic size={20} />
                         </button>
 
+                        {/* Phase 14: Writing Tools */}
+                        <button
+                            type="button"
+                            className="p-2 rounded-lg transition-fast flex-shrink-0"
+                            style={{ color: "var(--accent)" }}
+                            disabled={isBlocked || isUploading}
+                            onClick={() => setShowWritingTools(true)}
+                            title="AI Writing Tools"
+                        >
+                            <Wand2 size={20} />
+                        </button>
+
                         <button
                             type="button"
                             className="p-2 rounded-lg transition-fast flex-shrink-0"
@@ -952,6 +1067,21 @@ const ChatWindow = ({ onBack }) => {
                     onClose={() => setShowGroupInfo(false)}
                 />
             )}
+
+            {/* Phase 14: Writing Tools Modal */}
+            <WritingToolsModal
+                isOpen={showWritingTools}
+                onClose={() => setShowWritingTools(false)}
+                onUseText={(text) => setInput(text)}
+                initialText={input}
+            />
+
+            {/* Phase 14: Chat Summary Modal */}
+            <ChatSummaryModal
+                isOpen={showSummary}
+                onClose={() => setShowSummary(false)}
+                conversationId={selectedConversation?.id}
+            />
         </div>
     );
 };

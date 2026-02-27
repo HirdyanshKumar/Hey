@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
-import api from "../utils/api";
+import api, { updatePreferredLanguageAPI } from "../utils/api";
 import toast from "react-hot-toast";
 import {
     ArrowLeft,
@@ -15,6 +15,7 @@ import {
     Calendar,
     Loader2,
     Eye,
+    Languages,
 } from "lucide-react";
 
 const ProfilePage = () => {
@@ -30,6 +31,23 @@ const ProfilePage = () => {
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const [readReceipts, setReadReceipts] = useState(user?.readReceiptsEnabled !== false);
     const [togglingReceipts, setTogglingReceipts] = useState(false);
+    const [preferredLanguage, setPreferredLanguage] = useState(user?.preferredLanguage || "en");
+    const [savingLanguage, setSavingLanguage] = useState(false);
+
+    const languageOptions = [
+        { code: "en", name: "English" },
+        { code: "hi", name: "Hindi" },
+        { code: "es", name: "Spanish" },
+        { code: "fr", name: "French" },
+        { code: "de", name: "German" },
+        { code: "ja", name: "Japanese" },
+        { code: "zh", name: "Chinese" },
+        { code: "ar", name: "Arabic" },
+        { code: "pt", name: "Portuguese" },
+        { code: "ko", name: "Korean" },
+        { code: "ru", name: "Russian" },
+        { code: "it", name: "Italian" },
+    ];
 
     // Generate initials
     const getInitials = (name) =>
@@ -248,6 +266,42 @@ const ProfilePage = () => {
                             >
                                 <span className="toggle-switch-thumb" />
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Phase 14: Preferred Language */}
+                    <div className="profile-field">
+                        <label className="profile-field-label">
+                            <Languages size={14} />
+                            Preferred Language
+                        </label>
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs" style={{ color: "var(--text-muted)", maxWidth: "220px" }}>
+                                Messages will be translated to this language
+                            </p>
+                            <select
+                                className="profile-language-select"
+                                value={preferredLanguage}
+                                disabled={savingLanguage}
+                                onChange={async (e) => {
+                                    const newLang = e.target.value;
+                                    setSavingLanguage(true);
+                                    try {
+                                        const { data } = await updatePreferredLanguageAPI(newLang);
+                                        setPreferredLanguage(newLang);
+                                        updateUser(data.user);
+                                        toast.success(`Language set to ${languageOptions.find(l => l.code === newLang)?.name}`);
+                                    } catch {
+                                        toast.error("Failed to update language.");
+                                    } finally {
+                                        setSavingLanguage(false);
+                                    }
+                                }}
+                            >
+                                {languageOptions.map(lang => (
+                                    <option key={lang.code} value={lang.code}>{lang.name}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 

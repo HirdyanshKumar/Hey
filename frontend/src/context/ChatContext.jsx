@@ -113,6 +113,45 @@ export const ChatProvider = ({ children }) => {
         }
     }, [selectConversation, socket, isConnected]);
 
+    // Typing indicators
+    const stopTyping = useCallback(() => {
+        if (!socket || !isConnected || !selectedConvIdRef.current) return;
+
+        if (isTypingRef.current) {
+            isTypingRef.current = false;
+            socket.emit("typing:stop", { conversationId: selectedConvIdRef.current });
+        }
+
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+    }, [socket, isConnected]);
+
+    const startTyping = useCallback(() => {
+        if (!socket || !isConnected || !selectedConvIdRef.current || isTypingRef.current) return;
+
+        isTypingRef.current = true;
+        socket.emit("typing:start", { conversationId: selectedConvIdRef.current });
+
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            stopTyping();
+        }, 3000);
+    }, [socket, isConnected, stopTyping]);
+
+    const resetTypingTimeout = useCallback(() => {
+        if (!isTypingRef.current) {
+            startTyping();
+            return;
+        }
+
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            stopTyping();
+        }, 3000);
+    }, [startTyping, stopTyping]);
+
     // Send a message via Socket.IO (supports replyToId and media attachments)
     const sendMessage = useCallback((content, attachment = null) => {
         if (!socket || !isConnected || !selectedConvIdRef.current) return;
@@ -169,45 +208,6 @@ export const ChatProvider = ({ children }) => {
         if (!socket || !isConnected) return;
         socket.emit("message:deleteForEveryone", { messageId });
     }, [socket, isConnected]);
-
-    // Typing indicators
-    const startTyping = useCallback(() => {
-        if (!socket || !isConnected || !selectedConvIdRef.current || isTypingRef.current) return;
-
-        isTypingRef.current = true;
-        socket.emit("typing:start", { conversationId: selectedConvIdRef.current });
-
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => {
-            stopTyping();
-        }, 3000);
-    }, [socket, isConnected]);
-
-    const stopTyping = useCallback(() => {
-        if (!socket || !isConnected || !selectedConvIdRef.current) return;
-
-        if (isTypingRef.current) {
-            isTypingRef.current = false;
-            socket.emit("typing:stop", { conversationId: selectedConvIdRef.current });
-        }
-
-        if (typingTimeoutRef.current) {
-            clearTimeout(typingTimeoutRef.current);
-            typingTimeoutRef.current = null;
-        }
-    }, [socket, isConnected]);
-
-    const resetTypingTimeout = useCallback(() => {
-        if (!isTypingRef.current) {
-            startTyping();
-            return;
-        }
-
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => {
-            stopTyping();
-        }, 3000);
-    }, [startTyping, stopTyping]);
 
     // Block / Unblock
     const blockUser = useCallback(async (targetUserId) => {

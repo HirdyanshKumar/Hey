@@ -17,6 +17,7 @@ const getProfile = async (req, res, next) => {
                 isOnline: true,
                 lastSeen: true,
                 readReceiptsEnabled: true,
+                preferredLanguage: true,
                 createdAt: true,
             },
         });
@@ -69,6 +70,7 @@ const updateProfile = async (req, res, next) => {
                 isOnline: true,
                 lastSeen: true,
                 readReceiptsEnabled: true,
+                preferredLanguage: true,
                 createdAt: true,
             },
         });
@@ -237,6 +239,39 @@ const getBlockedUsers = async (req, res, next) => {
     }
 };
 
+// PUT /api/users/settings/preferred-language — Update preferred language
+const updatePreferredLanguage = async (req, res, next) => {
+    try {
+        const { language } = req.body;
+
+        const validLanguages = ["en", "hi", "es", "fr", "de", "ja", "zh", "ar", "pt", "ko", "ru", "it"];
+        if (!language || !validLanguages.includes(language)) {
+            return res.status(400).json({ error: "Invalid language code." });
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: req.user.id },
+            data: { preferredLanguage: language },
+            select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                bio: true,
+                isOnline: true,
+                lastSeen: true,
+                readReceiptsEnabled: true,
+                preferredLanguage: true,
+                createdAt: true,
+            },
+        });
+
+        res.json({ message: `Preferred language updated to ${language}.`, user: updatedUser });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // PUT /api/users/settings/read-receipts — Toggle read receipts
 const updateReadReceiptsSetting = async (req, res, next) => {
     try {
@@ -268,4 +303,4 @@ const updateReadReceiptsSetting = async (req, res, next) => {
     }
 };
 
-module.exports = { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers, updateReadReceiptsSetting };
+module.exports = { getProfile, updateProfile, updateAvatar, searchUsers, blockUser, unblockUser, getBlockedUsers, updateReadReceiptsSetting, updatePreferredLanguage };

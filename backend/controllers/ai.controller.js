@@ -1,5 +1,5 @@
 const prisma = require("../config/prisma");
-const { getAIBotUser, generateSmartReplies } = require("../services/ai.service");
+const { getAIBotUser, generateSmartReplies, summarizeConversation, rephraseText, translateMessage } = require("../services/ai.service");
 
 // GET /api/ai/bot/conversation
 const getOrCreateAIBotConversation = async (req, res) => {
@@ -118,4 +118,107 @@ const getSmartReplies = async (req, res) => {
     }
 };
 
-module.exports = { getOrCreateAIBotConversation, getSmartReplies };
+// ── Phase 14: AI Writing Tools & Translation ──────────────────
+
+// POST /api/ai/summarize/:conversationId
+const summarizeChat = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const userId = req.user.id;
+
+        // Ensure user is participant
+        const participant = await prisma.conversationParticipant.findFirst({
+            where: { conversationId, userId }
+        });
+        if (!participant) {
+            return res.status(403).json({ error: "Not a participant." });
+        }
+
+        // Fetch last 50 messages for summarization
+        const messages = await prisma.message.findMany({
+            where: { conversationId, isDeleted: false, content: { not: null } },
+            orderBy: { createdAt: "asc" },
+            take: 50,
+            include: {
+                sender: { select: { displayName: true } }
+            }
+        });
+
+        if (messages.length === 0) {
+            return res.status(200).json({ summary: "No messages to summarize in this conversation." });
+        }
+
+        const formattedMessages = messages
+            .filter(m => m.content && m.content.trim())
+            .map(m => ({
+                senderName: m.sender.displayName,
+                content: m.content
+            }));
+
+        if (formattedMessages.length === 0) {
+            return res.status(200).json({ summary: "No text messages to summarize. The conversation only contains media." });
+        }
+
+        const summary = await summarizeConversation(formattedMessages);
+        return res.status(200).json({ summary, messageCount: messages.length });
+
+    } catch (error) {
+        console.error("summarizeChat error:", error);
+        return res.status(500).json({ error: "Failed to summarize conversation." });
+    }
+};
+
+// POST /api/ai/rephrase
+const rephrase = async (req, res) => {
+    try {
+        const { text, mode } = req.body;
+
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: "Text is required." });
+        }
+
+        const validModes = ["rephrase", "grammar", "formal", "casual", "professional"];
+        const selectedMode = validModes.includes(mode) ? mode : "rephrase";
+
+        const result = await rephraseText(text.trim(), selectedMode);
+
+        if (!result) {
+            return res.status(500).json({ error: "Failed to process text. Please try again." });
+        }
+
+        return res.status(200).json({ result, mode: selectedMode });
+
+    } catch (error) {
+        console.error("rephrase error:", error);
+        return res.status(500).json({ error: "Failed to rephrase text." });
+    }
+};
+
+// POST /api/ai/translate
+const translate = async (req, res) => {
+    try {
+        const { text, targetLanguage } = req.body;
+
+        if (!text || !text.trim()) {
+            return res.status(400).json({ error: "Text is required." });
+        }
+
+        if (!targetLanguage || !targetLanguage.trim()) {
+            return res.status(400).json({ error: "Target language is required." });
+        }
+
+        const result = await translateMessage(text.trim(), targetLanguage.trim());
+
+        if (!result) {
+            return res.status(500).json({ error: "Failed to translate. Please try again." });
+        }
+
+        return res.status(200).json({ translatedText: result, targetLanguage });
+
+    } catch (error) {
+        console.error("translate error:", error);
+        return res.status(500).json({ error: "Failed to translate message." });
+    }
+};
+
+module.exports = { getOrCreateAIBotConversation, getSmartReplies, summarizeChat, rephrase, translate };

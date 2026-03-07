@@ -12,9 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@prisma/adapter-pg": "^7.4.0",
-    "@prisma/client": "^7.4.0",
-    "@supabase/supabase-js": "^2.97.0",
+    "@prisma/client": "^6.19.2",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",
     "cookie-parser": "^1.4.7",
@@ -24,8 +22,7 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "pg": "^8.18.0",
-    "prisma": "^7.4.0",
+    "prisma": "^6.19.2",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {

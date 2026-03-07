@@ -6,11 +6,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(uuid()) @map("_id")
   email       String   @unique
   password    String
   displayName String   @map("display_name")
@@ -33,9 +34,9 @@ model User {
 }
 
 model BlockedUser {
-  id        String   @id @default(uuid()) @db.Uuid
-  blockerId String   @map("blocker_id") @db.Uuid
-  blockedId String   @map("blocked_id") @db.Uuid
+  id        String   @id @default(uuid()) @map("_id")
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
   createdAt DateTime @default(now()) @map("created_at")
 
   blocker   User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
@@ -46,12 +47,12 @@ model BlockedUser {
 }
 
 model Conversation {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(uuid()) @map("_id")
   isGroup     Boolean  @default(false) @map("is_group")
   name        String?
   description String?
   avatarUrl   String?  @map("avatar_url")
-  createdById String?  @map("created_by_id") @db.Uuid
+  createdById String?  @map("created_by_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -62,9 +63,9 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  id             String       @id @default(uuid()) @db.Uuid
-  conversationId String       @map("conversation_id") @db.Uuid
-  userId         String       @map("user_id") @db.Uuid
+  id             String       @id @default(uuid()) @map("_id")
+  conversationId String       @map("conversation_id")
+  userId         String       @map("user_id")
   role           String       @default("member")
   joinedAt       DateTime     @default(now()) @map("joined_at")
 
@@ -76,9 +77,9 @@ model ConversationParticipant {
 }
 
 model Message {
-  id               String       @id @default(uuid()) @db.Uuid
-  conversationId   String       @map("conversation_id") @db.Uuid
-  senderId         String       @map("sender_id") @db.Uuid
+  id               String       @id @default(uuid()) @map("_id")
+  conversationId   String       @map("conversation_id")
+  senderId         String       @map("sender_id")
   content          String?      // Now optional because a message might be just media
   fileUrl          String?      @map("file_url")
   fileType         String?      @map("file_type")  // "image" | "video"
@@ -90,13 +91,13 @@ model Message {
   editedAt         DateTime?    @map("edited_at")
   isDeleted        Boolean      @default(false) @map("is_deleted")
   deletedForAll    Boolean      @default(false) @map("deleted_for_all")
-  deletedByUserIds String[]     @default([]) @map("deleted_by_user_ids") @db.Uuid
-  replyToId        String?      @map("reply_to_id") @db.Uuid
+  deletedByUserIds String[]     @default([]) @map("deleted_by_user_ids")
+  replyToId        String?      @map("reply_to_id")
   createdAt        DateTime     @default(now()) @map("created_at")
 
   conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender           User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  replyTo          Message?     @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replyTo          Message?     @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   replies          Message[]    @relation("MessageReplies")
 
   @@map("messages")

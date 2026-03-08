@@ -1573,3 +1573,251 @@ a:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
+
+/* ── Phase 15: Chat Layout ─────────────────────────── */
+.chat-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.chat-layout-sidebar {
+  flex-shrink: 0;
+}
+
+.chat-layout-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Sidebar default width */
+.chat-sidebar {
+  width: 320px;
+  min-width: 320px;
+}
+
+/* ── Phase 15: Error Boundary ──────────────────────── */
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  background: radial-gradient(ellipse at top, #151d2e 0%, #0f1623 70%);
+  padding: 1rem;
+}
+
+.error-boundary-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 60px rgba(239, 68, 68, 0.05);
+  animation: authFadeIn 0.4s ease;
+}
+
+.error-boundary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--error);
+  margin-bottom: 1.25rem;
+}
+
+.error-boundary-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.error-boundary-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.error-boundary-detail {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1.5rem;
+  word-break: break-word;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.error-boundary-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.error-boundary-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.error-boundary-btn-primary {
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  color: #fff;
+}
+
+.error-boundary-btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.error-boundary-btn-secondary {
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.error-boundary-btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ── Phase 15: Responsive — Tablet (≤768px) ────────── */
+@media (max-width: 768px) {
+  .chat-layout {
+    position: relative;
+  }
+
+  .chat-layout-sidebar {
+    width: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+  }
+
+  .chat-layout-main {
+    width: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+  }
+
+  .chat-layout-hidden {
+    display: none !important;
+  }
+
+  .chat-sidebar {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .chat-bubble {
+    max-width: 85%;
+  }
+
+  .profile-card {
+    padding: 1.5rem;
+  }
+
+  .auth-card {
+    padding: 2rem 1.5rem;
+  }
+
+  .writing-tools-modal,
+  .summary-modal {
+    width: 95%;
+    padding: 1.25rem;
+  }
+
+  .group-info-panel {
+    width: 95vw;
+    padding: 18px;
+  }
+
+  .new-chat-modal {
+    width: 95%;
+  }
+
+  .msg-context-menu {
+    min-width: 160px;
+  }
+}
+
+/* ── Phase 15: Responsive — Mobile (≤480px) ────────── */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 1.5rem 1rem;
+    border-radius: 12px;
+  }
+
+  .auth-title {
+    font-size: 1.25rem;
+  }
+
+  .auth-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .profile-card {
+    padding: 1.25rem;
+    border-radius: 12px;
+  }
+
+  .profile-avatar-wrapper {
+    width: 80px;
+    height: 80px;
+  }
+
+  .profile-header-title {
+    font-size: 1.1rem;
+  }
+
+  .writing-tools-modal,
+  .summary-modal {
+    width: 98%;
+    max-height: 85vh;
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  .writing-tools-mode-btn {
+    padding: 5px 10px;
+    font-size: 0.72rem;
+  }
+
+  .writing-tools-textarea {
+    font-size: 0.8125rem;
+  }
+
+  .chat-bubble {
+    max-width: 90%;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .error-boundary-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .error-boundary-actions {
+    flex-direction: column;
+  }
+}

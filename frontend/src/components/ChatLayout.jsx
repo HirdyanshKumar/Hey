@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import WelcomeScreen from "./WelcomeScreen";
 import ChatWindow from "./ChatWindow";
@@ -7,16 +8,29 @@ import { useChat } from "../context/ChatContext";
 
 const ChatContent = () => {
     const { selectedConversation, selectConversation } = useChat();
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    const handleBack = () => {
+        selectConversation(null);
+    };
 
     return (
-        <div className="flex h-screen w-screen overflow-hidden" style={{ backgroundColor: "var(--bg-primary)" }}>
-            {/* Sidebar */}
-            <Sidebar />
+        <div className="chat-layout" style={{ backgroundColor: "var(--bg-primary)" }}>
+            {/* Sidebar — hidden on mobile when a conversation is selected */}
+            <div className={`chat-layout-sidebar ${isMobile && selectedConversation ? "chat-layout-hidden" : ""}`}>
+                <Sidebar />
+            </div>
 
-            {/* Main Chat Area */}
-            <main className="flex-1 flex flex-col min-w-0">
+            {/* Main Chat Area — hidden on mobile when no conversation is selected */}
+            <main className={`chat-layout-main ${isMobile && !selectedConversation ? "chat-layout-hidden" : ""}`}>
                 {selectedConversation ? (
-                    <ChatWindow onBack={() => selectConversation(null)} />
+                    <ChatWindow onBack={handleBack} />
                 ) : (
                     <WelcomeScreen />
                 )}

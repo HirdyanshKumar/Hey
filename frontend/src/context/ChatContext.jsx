@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useSocket } from "./SocketContext";
 import { useAuth } from "./AuthContext";
 import api from "../utils/api";
+import toast from "react-hot-toast";
 
 const ChatContext = createContext(null);
 
@@ -45,6 +46,7 @@ export const ChatProvider = ({ children }) => {
             setConversations(data.conversations);
         } catch (error) {
             console.error("Failed to fetch conversations:", error);
+            toast.error("Failed to load conversations");
         } finally {
             setLoadingConversations(false);
         }
@@ -77,6 +79,7 @@ export const ChatProvider = ({ children }) => {
             }
         } catch (error) {
             console.error("Failed to fetch conversation:", error);
+            toast.error("Failed to open conversation");
         } finally {
             setLoadingMessages(false);
         }
@@ -199,6 +202,7 @@ export const ChatProvider = ({ children }) => {
             setMessages((prev) => prev.filter((m) => m.id !== messageId));
         } catch (error) {
             console.error("Failed to delete message for self:", error);
+            toast.error("Failed to delete message");
             throw error;
         }
     }, []);
@@ -216,6 +220,7 @@ export const ChatProvider = ({ children }) => {
             return true;
         } catch (error) {
             console.error("Failed to block user:", error);
+            toast.error("Failed to block user");
             return false;
         }
     }, []);
@@ -226,6 +231,7 @@ export const ChatProvider = ({ children }) => {
             return true;
         } catch (error) {
             console.error("Failed to unblock user:", error);
+            toast.error("Failed to unblock user");
             return false;
         }
     }, []);
@@ -388,6 +394,7 @@ export const ChatProvider = ({ children }) => {
             return conv;
         } catch (error) {
             console.error("Failed to start AI Chat:", error);
+            toast.error("Failed to start AI chat");
             throw error;
         }
     }, [selectConversation, socket, isConnected]);

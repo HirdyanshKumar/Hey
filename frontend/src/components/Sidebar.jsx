@@ -6,6 +6,7 @@ import { useChat } from "../context/ChatContext";
 import { Search, Settings, Plus, X, MessageCircle, Loader2, Users, SearchIcon, Bot } from "lucide-react";
 import api from "../utils/api";
 import MessageSearchModal from "./MessageSearchModal";
+import toast from "react-hot-toast";
 
 const Sidebar = () => {
     const [searchQuery, setSearchQuery] = useState("");
@@ -103,6 +104,7 @@ const Sidebar = () => {
                 setSearchResults(data.users || []);
             } catch (error) {
                 console.error("User search failed:", error);
+                toast.error("Failed to search users");
             } finally {
                 setSearching(false);
             }
@@ -118,8 +120,10 @@ const Sidebar = () => {
             setShowNewChat(false);
             setNewChatSearch("");
             setSearchResults([]);
+            toast.success("Conversation started");
         } catch (error) {
             console.error("Failed to start conversation:", error);
+            toast.error("Failed to start conversation");
         } finally {
             setCreating(false);
         }
@@ -165,8 +169,10 @@ const Sidebar = () => {
             setSelectedMembers([]);
             setGroupSearchQuery("");
             setGroupSearchResults([]);
+            toast.success("Group created!");
         } catch (error) {
             console.error("Failed to create group:", error);
+            toast.error("Failed to create group");
         } finally {
             setCreatingGroup(false);
         }
@@ -174,10 +180,8 @@ const Sidebar = () => {
 
     return (
         <aside
-            className="flex flex-col h-full border-r"
+            className="chat-sidebar flex flex-col h-full border-r"
             style={{
-                width: "320px",
-                minWidth: "320px",
                 backgroundColor: "var(--bg-sidebar)",
                 borderColor: "var(--border)",
             }}

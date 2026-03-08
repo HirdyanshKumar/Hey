@@ -51,6 +51,8 @@ const register = async (req, res, next) => {
                 displayName: true,
                 avatarUrl: true,
                 bio: true,
+                readReceiptsEnabled: true,
+                preferredLanguage: true,
                 createdAt: true,
             },
         });
@@ -155,6 +157,8 @@ const getMe = async (req, res, next) => {
                 bio: true,
                 isOnline: true,
                 lastSeen: true,
+                readReceiptsEnabled: true,
+                preferredLanguage: true,
                 createdAt: true,
             },
         });

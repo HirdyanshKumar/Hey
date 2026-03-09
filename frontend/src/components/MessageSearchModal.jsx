@@ -15,20 +15,6 @@ const MessageSearchModal = ({ onClose }) => {
 
     const { selectConversation, setJumpToMessageId } = useChat();
 
-    // Debounce search
-    useEffect(() => {
-        if (!query.trim()) {
-            setResults([]);
-            return;
-        }
-
-        const timeoutId = setTimeout(() => {
-            performSearch();
-        }, 500);
-
-        return () => clearTimeout(timeoutId);
-    }, [query, startDate, endDate, hasMedia, performSearch]);
-
     const performSearch = useCallback(async () => {
         if (!query.trim() && !hasMedia) return;
 
@@ -48,6 +34,20 @@ const MessageSearchModal = ({ onClose }) => {
             setSearching(false);
         }
     }, [query, startDate, endDate, hasMedia]);
+
+    // Debounce search
+    useEffect(() => {
+        if (!query.trim()) {
+            setResults([]);
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            performSearch();
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [query, startDate, endDate, hasMedia, performSearch]);
 
     const handleJumpToMessage = async (msg) => {
         try {

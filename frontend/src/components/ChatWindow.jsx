@@ -87,6 +87,9 @@ const ChatWindow = ({ onBack }) => {
     // Focus input when conversation changes
     useEffect(() => {
         inputRef.current?.focus();
+        setInput(""); // Clear input on chat switch
+        clearSelectedFile(); // Clear selected file too
+        setReplyingTo(null); // Clear reply context
         if (selectedConversation?.id) {
             markAsRead();
         }
@@ -729,11 +732,24 @@ const ChatWindow = ({ onBack }) => {
                                                     🚫 This message was deleted
                                                 </p>
                                             ) : msg.content ? (
-                                                <p className="text-sm" style={{ lineHeight: "1.45" }}>{msg.content}</p>
+                                                <p className="text-sm" style={{ lineHeight: "1.45" }}>
+                                                    {translations[msg.id]?.visible && !translations[msg.id]?.loading
+                                                        ? translations[msg.id].text
+                                                        : msg.content}
+                                                </p>
                                             ) : null}
 
                                             {/* Meta: time + edited + receipt */}
                                             <div className="chat-bubble-meta">
+                                                {!isMine && !msg.isDeleted && msg.content && !translations[msg.id] && (
+                                                    <button 
+                                                        onClick={() => handleTranslate(msg)}
+                                                        className="text-[10px] font-semibold opacity-60 hover:opacity-100 transition-opacity mr-2 flex items-center gap-1"
+                                                        style={{ color: "var(--text-secondary)" }}
+                                                    >
+                                                        <Languages size={10} /> Translate
+                                                    </button>
+                                                )}
                                                 {msg.isEdited && !msg.isDeleted && (
                                                     <span className="msg-edited-tag">edited</span>
                                                 )}
@@ -760,18 +776,15 @@ const ChatWindow = ({ onBack }) => {
                                                             <span>Translating...</span>
                                                         </div>
                                                     ) : translations[msg.id].visible ? (
-                                                        <>
-                                                            <p className="msg-translation-text">{translations[msg.id].text}</p>
-                                                            <button
-                                                                className="msg-translation-toggle"
-                                                                onClick={() => setTranslations(prev => ({
-                                                                    ...prev,
-                                                                    [msg.id]: { ...prev[msg.id], visible: false }
-                                                                }))}
-                                                            >
-                                                                <Languages size={11} /> Hide translation
-                                                            </button>
-                                                        </>
+                                                        <button
+                                                            className="msg-translation-toggle"
+                                                            onClick={() => setTranslations(prev => ({
+                                                                ...prev,
+                                                                [msg.id]: { ...prev[msg.id], visible: false }
+                                                            }))}
+                                                        >
+                                                            <Languages size={11} /> Show original
+                                                        </button>
                                                     ) : (
                                                         <button
                                                             className="msg-translation-toggle"

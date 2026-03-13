@@ -14,6 +14,13 @@ import WritingToolsModal from "./WritingToolsModal";
 import ChatSummaryModal from "./ChatSummaryModal";
 import { translateMessageAPI } from "../utils/api";
 import toast from "react-hot-toast";
+import EmojiPicker from "emoji-picker-react";
+
+import { Avatar } from "./ui/avatar";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
+import { Spinner } from "./ui/spinner";
+import { cn } from "../lib/utils";
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000;
 const DELETE_WINDOW_MS = 60 * 60 * 1000;
@@ -31,7 +38,6 @@ const ChatWindow = ({ onBack }) => {
         unblockUser,
         checkBlockStatus,
         markAsRead,
-        // Phase 8
         replyingTo,
         setReplyingTo,
         cancelReply,
@@ -41,7 +47,6 @@ const ChatWindow = ({ onBack }) => {
         editMessage,
         deleteMessageForSelf,
         deleteMessageForEveryone,
-        // Phase 9
         jumpToMessageId,
         setJumpToMessageId,
     } = useChat();
@@ -56,46 +61,41 @@ const ChatWindow = ({ onBack }) => {
     const [showGroupInfo, setShowGroupInfo] = useState(false);
     const isGroup = selectedConversation?.isGroup;
 
-    // ── Phase 10: Media states ────────────────────────────
     const [selectedFile, setSelectedFile] = useState(null);
     const [filePreview, setFilePreview] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [lightboxMedia, setLightboxMedia] = useState(null);
     const fileInputRef = useRef(null);
 
-    // ── Phase 11: Voice Notes states ──────────────────────
     const [isVoiceRecording, setIsVoiceRecording] = useState(false);
 
-    // ── Phase 13: AI Chatbot & Smart Replies ──────────────
     const [smartReplies, setSmartReplies] = useState([]);
     const [loadingReplies, setLoadingReplies] = useState(false);
 
-    // ── Phase 14: AI Writing Tools & Translation ──────────
     const [showWritingTools, setShowWritingTools] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
-    const [translations, setTranslations] = useState({}); // { messageId: { text, loading, visible } }
+    const [translations, setTranslations] = useState({});
 
-    // ── Context menu state ────────────────────────────────
-    const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
+    const [contextMenu, setContextMenu] = useState(null);
     const contextMenuRef = useRef(null);
 
-    // Auto-scroll to bottom on new messages
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const emojiPickerRef = useRef(null);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // Focus input when conversation changes
     useEffect(() => {
         inputRef.current?.focus();
-        setInput(""); // Clear input on chat switch
-        clearSelectedFile(); // Clear selected file too
-        setReplyingTo(null); // Clear reply context
+        setInput("");
+        clearSelectedFile();
+        setReplyingTo(null);
         if (selectedConversation?.id) {
             markAsRead();
         }
     }, [selectedConversation?.id, markAsRead]);
 
-    // Pre-fill input when editing
     useEffect(() => {
         if (editingMessage) {
             setInput(editingMessage.content);
@@ -103,16 +103,14 @@ const ChatWindow = ({ onBack }) => {
         }
     }, [editingMessage]);
 
-    // Jump to searched message
     useEffect(() => {
         if (jumpToMessageId) {
-            // Slight delay to allow DOM to render if we just switched conversations
             const timer = setTimeout(() => {
                 const el = document.getElementById(`msg-${jumpToMessageId}`);
                 if (el) {
                     el.scrollIntoView({ behavior: "smooth", block: "center" });
-                    el.classList.add("msg-highlight");
-                    setTimeout(() => el.classList.remove("msg-highlight"), 2000);
+                    el.classList.add("bg-surface-hover", "transition-colors", "duration-1000");
+                    setTimeout(() => el.classList.remove("bg-surface-hover"), 2000);
                 }
                 setJumpToMessageId(null);
             }, 300);
@@ -120,7 +118,6 @@ const ChatWindow = ({ onBack }) => {
         }
     }, [jumpToMessageId, setJumpToMessageId, messages]);
 
-    // Check block status when conversation changes (only for DMs)
     useEffect(() => {
         const checkBlock = async () => {
             if (!selectedConversation || selectedConversation.isGroup) {
@@ -138,7 +135,6 @@ const ChatWindow = ({ onBack }) => {
         checkBlock();
     }, [selectedConversation?.id, user?.id, checkBlockStatus, selectedConversation]);
 
-    // Close menus on outside click
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -147,12 +143,14 @@ const ChatWindow = ({ onBack }) => {
             if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
                 setContextMenu(null);
             }
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
+                setShowEmojiPicker(false);
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Close context menu on scroll
     useEffect(() => {
         const handleScroll = () => setContextMenu(null);
         const area = document.querySelector(".chat-messages-area");
@@ -160,7 +158,6 @@ const ChatWindow = ({ onBack }) => {
         return () => area?.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // ── Phase 13: Fetch Smart Replies ─────────────────────
     useEffect(() => {
         const fetchSmartReplies = async () => {
             if (!selectedConversation || messages.length === 0) {
@@ -187,7 +184,6 @@ const ChatWindow = ({ onBack }) => {
             }
         };
 
-        // Debounce fetching slightly just to not spam API when rapidly switching
         const timer = setTimeout(() => {
             fetchSmartReplies();
         }, 500);
@@ -216,12 +212,11 @@ const ChatWindow = ({ onBack }) => {
                 formData.append("media", selectedFile);
 
                 const { data } = await uploadMediaAPI(formData);
-                attachment = data; // { fileUrl, fileType, fileName, fileSize }
+                attachment = data;
             }
 
             sendMessage(input.trim(), attachment);
 
-            // Clear input and file
             setInput("");
             clearSelectedFile();
         } catch (error) {
@@ -243,7 +238,7 @@ const ChatWindow = ({ onBack }) => {
             formData.append("media", audioFile);
 
             const { data } = await uploadMediaAPI(formData);
-            const attachment = data; // { fileUrl, fileType: "audio", fileName, fileSize }
+            const attachment = data;
 
             sendMessage("", attachment);
         } catch (error) {
@@ -265,7 +260,6 @@ const ChatWindow = ({ onBack }) => {
 
         setSelectedFile(file);
 
-        // Create preview
         const reader = new FileReader();
         reader.onload = () => setFilePreview(reader.result);
         reader.readAsDataURL(file);
@@ -313,7 +307,6 @@ const ChatWindow = ({ onBack }) => {
         }
     };
 
-    // ── Context Menu ──────────────────────────────────────
     const handleContextMenu = (e, msg) => {
         e.preventDefault();
         if (msg.isDeleted) return;
@@ -359,22 +352,19 @@ const ChatWindow = ({ onBack }) => {
         setInput("");
     };
 
-    // Scroll to a replied-to message
     const scrollToMessage = (messageId) => {
         const el = document.getElementById(`msg-${messageId}`);
         if (el) {
             el.scrollIntoView({ behavior: "smooth", block: "center" });
-            el.classList.add("msg-highlight");
-            setTimeout(() => el.classList.remove("msg-highlight"), 1500);
+            el.classList.add("bg-surface-hover", "transition-colors", "duration-1000");
+            setTimeout(() => el.classList.remove("bg-surface-hover"), 1500);
         }
     };
 
-    // ── Phase 14: Translate a message ──────────────────────
     const handleTranslate = async (msg) => {
         setContextMenu(null);
         const msgId = msg.id;
         if (translations[msgId]?.text) {
-            // Toggle visibility
             setTranslations(prev => ({
                 ...prev,
                 [msgId]: { ...prev[msgId], visible: !prev[msgId].visible }
@@ -411,7 +401,6 @@ const ChatWindow = ({ onBack }) => {
 
     if (!selectedConversation) return null;
 
-    // Get the other participant(s) for display
     const otherParticipants = selectedConversation.participants?.filter(
         (p) => p.user.id !== user?.id
     ) || [];
@@ -424,21 +413,11 @@ const ChatWindow = ({ onBack }) => {
         : false;
     const memberCount = selectedConversation.participants?.length || 0;
 
-    // Typing indicator
     const typingUserIds = getTypingUsers(selectedConversation.id);
     const typingNames = typingUserIds.map((id) => {
         const participant = selectedConversation.participants?.find((p) => p.user.id === id);
         return participant?.user?.displayName || "Someone";
     });
-
-    const getInitials = (name) => name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "?";
-
-    const getAvatarColor = (name) => {
-        const colors = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#14b8a6"];
-        let hash = 0;
-        for (let i = 0; i < (name?.length || 0); i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        return colors[Math.abs(hash) % colors.length];
-    };
 
     const formatTime = (dateStr) => {
         const date = new Date(dateStr);
@@ -486,46 +465,30 @@ const ChatWindow = ({ onBack }) => {
     };
 
     return (
-        <div className="flex flex-col h-full" style={{ backgroundColor: "var(--bg-chat)" }}>
+        <div className="flex h-full flex-col bg-surface-bg">
             {/* ── Chat Header ──────────────────────────────── */}
-            <div
-                className="flex items-center gap-3 px-5 py-3 border-b"
-                style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-secondary)" }}
-            >
+            <div className="flex items-center gap-3 border-b border-border bg-surface-panel px-5 py-3">
                 <button
-                    className="chat-back-btn md:hidden p-2 rounded-lg transition-fast"
-                    style={{ color: "var(--text-secondary)" }}
+                    className="rounded-lg p-2 text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary md:hidden"
                     onClick={onBack}
                 >
                     <ArrowLeft size={20} />
                 </button>
 
                 {/* Avatar */}
-                <div className="relative flex-shrink-0">
-                    {chatAvatar ? (
-                        <img src={chatAvatar} alt={chatName} className="w-10 h-10 rounded-full object-cover" />
-                    ) : (
-                        <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white"
-                            style={{ backgroundColor: getAvatarColor(chatName) }}
-                        >
-                            {getInitials(chatName)}
-                        </div>
-                    )}
+                <div className="relative shrink-0">
+                    <Avatar name={chatName} src={chatAvatar} size="md" />
                     {isOnline && (
-                        <div
-                            className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
-                            style={{ backgroundColor: "var(--online)", borderColor: "var(--bg-secondary)" }}
-                        />
+                        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface-bg bg-status-success" />
                     )}
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+                    <h3 className="truncate text-sm font-semibold text-content-primary">
                         {chatName}
                     </h3>
-                    <p className="text-xs" style={{ color: isOnline ? "var(--online)" : "var(--text-muted)" }}>
+                    <p className={cn("text-xs", isOnline ? "text-status-success" : "text-content-muted")}>
                         {typingNames.length > 0
                             ? `${typingNames.join(", ")} typing...`
                             : isGroup
@@ -539,55 +502,33 @@ const ChatWindow = ({ onBack }) => {
                 {/* More menu */}
                 <div className="relative" ref={menuRef}>
                     <button
-                        className="p-2 rounded-lg transition-fast"
-                        style={{ color: "var(--text-secondary)" }}
+                        className="rounded-lg p-2 text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
                         onClick={() => setShowMenu(!showMenu)}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                     >
                         <MoreVertical size={18} />
                     </button>
 
                     {showMenu && (
-                        <div
-                            className="absolute right-0 top-full mt-1 py-1 rounded-lg shadow-lg z-10"
-                            style={{
-                                backgroundColor: "var(--bg-secondary)",
-                                border: "1px solid var(--border)",
-                                minWidth: "160px",
-                            }}
-                        >
+                        <div className="absolute right-0 top-full z-10 mt-1 min-w-[160px] rounded-lg border border-border bg-surface-elevated py-1 shadow-elevated animate-fade-in">
                             {isGroup && (
                                 <button
-                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
-                                    style={{ color: "var(--text-primary)" }}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-content-primary transition-colors hover:bg-surface-hover"
                                     onClick={() => { setShowGroupInfo(true); setShowMenu(false); }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
-                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                                 >
-                                    <Users size={16} />
-                                    Group Info
+                                    <Users size={16} /> Group Info
                                 </button>
                             )}
-                            {/* Phase 14: Summarize Chat */}
                             <button
-                                className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
-                                style={{ color: "var(--text-primary)" }}
+                                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-content-primary transition-colors hover:bg-surface-hover"
                                 onClick={() => { setShowSummary(true); setShowMenu(false); }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                             >
-                                <FileText size={16} />
-                                Summarize Chat
+                                <FileText size={16} /> Summarize Chat
                             </button>
                             {!isGroup && (
                                 <button
-                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-fast text-left"
-                                    style={{ color: isBlocked ? "var(--online)" : "var(--error)" }}
+                                    className={cn("flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-surface-hover", isBlocked ? "text-status-success" : "text-status-error")}
                                     onClick={handleBlock}
                                     disabled={blockLoading}
-                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
-                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                                 >
                                     {isBlocked ? <ShieldOff size={16} /> : <ShieldAlert size={16} />}
                                     {blockLoading ? "Loading..." : isBlocked ? "Unblock User" : "Block User"}
@@ -600,29 +541,22 @@ const ChatWindow = ({ onBack }) => {
 
             {/* ── Blocked Banner ──────────────────────────── */}
             {isBlocked && (
-                <div
-                    className="flex items-center justify-center gap-2 px-4 py-2 text-sm"
-                    style={{
-                        backgroundColor: "rgba(239, 68, 68, 0.1)",
-                        color: "var(--error)",
-                        borderBottom: "1px solid var(--border)",
-                    }}
-                >
+                <div className="flex items-center justify-center gap-2 border-b border-border bg-status-error/10 px-4 py-2 text-sm text-status-error">
                     <ShieldAlert size={14} />
                     You have blocked this user. Unblock to continue chatting.
                 </div>
             )}
 
             {/* ── Messages Area ─────────────────────────────── */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 chat-messages-area" style={{ position: "relative" }}>
+            <div className="chat-messages-area relative flex-1 overflow-y-auto px-5 py-4">
                 {loadingMessages ? (
-                    <div className="flex items-center justify-center h-full">
-                        <div className="chat-loading-spinner" />
+                    <div className="flex h-full items-center justify-center">
+                        <Spinner />
                     </div>
                 ) : messages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full">
+                    <div className="flex h-full items-center justify-center">
                         <div className="text-center">
-                            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                            <p className="text-sm text-content-muted">
                                 No messages yet. Say hello! 👋
                             </p>
                         </div>
@@ -641,60 +575,55 @@ const ChatWindow = ({ onBack }) => {
                                 <div key={msg.id} id={`msg-${msg.id}`}>
                                     {/* Date separator */}
                                     {showDate && (
-                                        <div className="chat-date-separator">
-                                            <span>{formatDateSeparator(msg.createdAt)}</span>
+                                        <div className="my-4 flex items-center justify-center">
+                                            <span className="rounded-full border border-border bg-surface-elevated/50 px-3 py-1 text-[11px] font-semibold tracking-wider text-content-muted">
+                                                {formatDateSeparator(msg.createdAt)}
+                                            </span>
                                         </div>
                                     )}
 
                                     <div
-                                        className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : "flex-row"} msg-row`}
-                                        style={{ marginTop: showAvatar || showDate ? "12px" : "2px" }}
+                                        className={cn("flex flex-row items-end gap-2", isMine && "flex-row-reverse", (showAvatar || showDate) ? "mt-3" : "mt-0.5")}
                                         onContextMenu={(e) => handleContextMenu(e, msg)}
                                     >
                                         {/* Sender avatar */}
-                                        <div className="w-7 flex-shrink-0">
+                                        <div className="w-7 shrink-0">
                                             {showAvatar && !isMine && (
-                                                msg.sender?.avatarUrl ? (
-                                                    <img
-                                                        src={msg.sender.avatarUrl}
-                                                        alt={msg.sender.displayName}
-                                                        className="w-7 h-7 rounded-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                                        style={{ backgroundColor: getAvatarColor(msg.sender?.displayName) }}
-                                                    >
-                                                        {getInitials(msg.sender?.displayName)}
-                                                    </div>
-                                                )
+                                                <Avatar name={msg.sender?.displayName} src={msg.sender?.avatarUrl} size="sm" />
                                             )}
                                         </div>
 
                                         {/* Message bubble */}
                                         <div
-                                            className={`chat-bubble ${isMine ? "chat-bubble-sent" : "chat-bubble-received"} ${msg.isDeleted ? "msg-deleted-bubble" : ""}`}
-                                            style={isBot && !isMine ? { border: "1px solid var(--accent)", boxShadow: "0 0 8px rgba(var(--accent-rgb), 0.2)" } : {}}
+                                            className={cn(
+                                                "relative max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm sm:max-w-[65%]",
+                                                msg.isDeleted
+                                                    ? "border border-border bg-surface-bg text-content-muted italic opacity-70"
+                                                    : isMine
+                                                    ? "rounded-br-sm bg-accent text-white"
+                                                    : "rounded-bl-sm border border-border bg-surface-elevated text-content-primary",
+                                                isBot && !isMine && "border-accent shadow-[0_0_8px_rgba(109,40,217,0.2)]"
+                                            )}
                                         >
                                             {/* Sender name (group only, received messages) */}
                                             {isGroup && !isMine && showAvatar && !msg.isDeleted && (
-                                                <p className="group-sender-name" style={{ color: getAvatarColor(msg.sender?.displayName) }}>
-                                                    {msg.sender?.displayName} {isBot && <Sparkles size={12} className="inline ml-1 text-yellow-500" />}
+                                                <p className="mb-1 text-xs font-semibold text-content-secondary">
+                                                    {msg.sender?.displayName} {isBot && <Sparkles size={12} className="ml-1 inline text-yellow-500" />}
                                                 </p>
                                             )}
 
                                             {/* Reply preview (inline) */}
                                             {msg.replyTo && !msg.isDeleted && (
                                                 <div
-                                                    className="reply-preview-inline"
+                                                    className="mb-1.5 flex cursor-pointer items-stretch overflow-hidden rounded-lg bg-black/10 text-xs transition-colors hover:bg-black/15"
                                                     onClick={() => scrollToMessage(msg.replyTo.id)}
                                                 >
-                                                    <div className="reply-preview-inline-bar" />
-                                                    <div className="reply-preview-inline-content">
-                                                        <span className="reply-preview-inline-name">
+                                                    <div className={cn("w-1 shrink-0", isMine ? "bg-white/50" : "bg-accent/50")} />
+                                                    <div className="flex flex-col px-2 py-1.5 opacity-80">
+                                                        <span className="font-semibold">
                                                             {msg.replyTo.sender?.displayName || "Unknown"}
                                                         </span>
-                                                        <span className="reply-preview-inline-text">
+                                                        <span className="truncate">
                                                             {msg.replyTo.isDeleted
                                                                 ? "🚫 This message was deleted"
                                                                 : msg.replyTo.content?.length > 60
@@ -713,14 +642,14 @@ const ChatWindow = ({ onBack }) => {
                                                     </div>
                                                 ) : (
                                                     <div
-                                                        className="mb-1 rounded-lg overflow-hidden cursor-pointer"
+                                                        className="mb-1 cursor-pointer overflow-hidden rounded-lg"
                                                         onClick={() => setLightboxMedia(msg)}
                                                         style={{ maxWidth: "250px", maxHeight: "250px" }}
                                                     >
                                                         {msg.fileType === "video" ? (
-                                                            <video src={msg.fileUrl} className="w-full h-full object-cover" />
+                                                            <video src={msg.fileUrl} className="h-full w-full object-cover" />
                                                         ) : (
-                                                            <img src={msg.fileUrl} alt={msg.fileName || "attachment"} className="w-full h-full object-cover" />
+                                                            <img src={msg.fileUrl} alt={msg.fileName || "attachment"} className="h-full w-full object-cover" />
                                                         )}
                                                     </div>
                                                 )
@@ -728,11 +657,9 @@ const ChatWindow = ({ onBack }) => {
 
                                             {/* Message content or deleted placeholder */}
                                             {msg.isDeleted ? (
-                                                <p className="msg-deleted-placeholder">
-                                                    🚫 This message was deleted
-                                                </p>
+                                                <p>🚫 This message was deleted</p>
                                             ) : msg.content ? (
-                                                <p className="text-sm" style={{ lineHeight: "1.45" }}>
+                                                <p className="text-sm leading-relaxed">
                                                     {translations[msg.id]?.visible && !translations[msg.id]?.loading
                                                         ? translations[msg.id].text
                                                         : msg.content}
@@ -740,24 +667,23 @@ const ChatWindow = ({ onBack }) => {
                                             ) : null}
 
                                             {/* Meta: time + edited + receipt */}
-                                            <div className="chat-bubble-meta">
+                                            <div className={cn("mt-1 flex items-center justify-end gap-1.5 text-[10px]", isMine ? "text-white/70" : "text-content-muted")}>
                                                 {!isMine && !msg.isDeleted && msg.content && !translations[msg.id] && (
                                                     <button 
                                                         onClick={() => handleTranslate(msg)}
-                                                        className="text-[10px] font-semibold opacity-60 hover:opacity-100 transition-opacity mr-2 flex items-center gap-1"
-                                                        style={{ color: "var(--text-secondary)" }}
+                                                        className="mr-2 flex items-center gap-1 font-semibold opacity-60 transition-opacity hover:opacity-100"
                                                     >
                                                         <Languages size={10} /> Translate
                                                     </button>
                                                 )}
                                                 {msg.isEdited && !msg.isDeleted && (
-                                                    <span className="msg-edited-tag">edited</span>
+                                                    <span className="italic">edited</span>
                                                 )}
-                                                <span className="chat-bubble-time">{formatTime(msg.createdAt)}</span>
+                                                <span>{formatTime(msg.createdAt)}</span>
                                                 {isMine && !msg.isDeleted && (
-                                                    <span className={`message-receipt message-receipt-${msg.status || 'sent'}`}>
+                                                    <span>
                                                         {msg.status === 'read' ? (
-                                                            <CheckCheck size={14} />
+                                                            <CheckCheck size={14} className="text-white" />
                                                         ) : msg.status === 'delivered' ? (
                                                             <CheckCheck size={14} />
                                                         ) : (
@@ -769,15 +695,15 @@ const ChatWindow = ({ onBack }) => {
 
                                             {/* Phase 14: Translation */}
                                             {translations[msg.id] && (
-                                                <div className="msg-translation">
+                                                <div className="mt-2 border-t border-black/10 pt-1">
                                                     {translations[msg.id].loading ? (
-                                                        <div className="msg-translation-loading">
+                                                        <div className="flex gap-1 items-center text-[10px] text-content-muted opacity-80">
                                                             <Loader2 size={12} className="animate-spin" />
                                                             <span>Translating...</span>
                                                         </div>
                                                     ) : translations[msg.id].visible ? (
                                                         <button
-                                                            className="msg-translation-toggle"
+                                                            className={cn("flex items-center gap-1 text-[10px] opacity-70 transition-opacity hover:opacity-100", isMine ? "text-white" : "text-accent")}
                                                             onClick={() => setTranslations(prev => ({
                                                                 ...prev,
                                                                 [msg.id]: { ...prev[msg.id], visible: false }
@@ -787,7 +713,7 @@ const ChatWindow = ({ onBack }) => {
                                                         </button>
                                                     ) : (
                                                         <button
-                                                            className="msg-translation-toggle"
+                                                            className={cn("flex items-center gap-1 text-[10px] opacity-70 transition-opacity hover:opacity-100", isMine ? "text-white" : "text-accent")}
                                                             onClick={() => setTranslations(prev => ({
                                                                 ...prev,
                                                                 [msg.id]: { ...prev[msg.id], visible: true }
@@ -806,14 +732,12 @@ const ChatWindow = ({ onBack }) => {
 
                         {/* Typing indicator */}
                         {typingNames.length > 0 && (
-                            <div className="flex items-end gap-2 flex-row" style={{ marginTop: "8px" }}>
-                                <div className="w-7 flex-shrink-0" />
-                                <div className="chat-typing-indicator">
-                                    <div className="chat-typing-dots">
-                                        <span className="chat-typing-dot" />
-                                        <span className="chat-typing-dot" />
-                                        <span className="chat-typing-dot" />
-                                    </div>
+                            <div className="mt-2 flex flex-row items-end gap-2">
+                                <div className="w-7 shrink-0" />
+                                <div className="flex h-8 items-center gap-1 rounded-2xl rounded-bl-sm border border-border bg-surface-elevated px-3 py-2 text-content-muted">
+                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-content-muted" style={{ animationDelay: '0ms' }} />
+                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-content-muted" style={{ animationDelay: '150ms' }} />
+                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-content-muted" style={{ animationDelay: '300ms' }} />
                                 </div>
                             </div>
                         )}
@@ -826,21 +750,20 @@ const ChatWindow = ({ onBack }) => {
                 {contextMenu && (
                     <div
                         ref={contextMenuRef}
-                        className="msg-context-menu"
+                        className="fixed z-50 flex w-48 flex-col gap-0.5 rounded-xl border border-border bg-surface-elevated p-1 shadow-elevated animate-fade-in"
                         style={{
                             top: contextMenu.y,
-                            left: Math.min(contextMenu.x, 250),
+                            left: Math.min(contextMenu.x, window.innerWidth - 200),
                         }}
                     >
                         {/* Reply */}
-                        <button className="msg-context-item" onClick={() => handleReply(contextMenu.message)}>
-                            <Reply size={15} />
-                            Reply
+                        <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-content-primary transition-colors hover:bg-surface-hover" onClick={() => handleReply(contextMenu.message)}>
+                            <Reply size={15} /> Reply
                         </button>
 
                         {/* Phase 14: Translate */}
                         {contextMenu.message.content && (
-                            <button className="msg-context-item" onClick={() => handleTranslate(contextMenu.message)}>
+                            <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-content-primary transition-colors hover:bg-surface-hover" onClick={() => handleTranslate(contextMenu.message)}>
                                 <Languages size={15} />
                                 {translations[contextMenu.message.id]?.text ? "Toggle Translation" : "Translate"}
                             </button>
@@ -848,23 +771,20 @@ const ChatWindow = ({ onBack }) => {
 
                         {/* Edit (own messages, within window) */}
                         {canEdit(contextMenu.message) && (
-                            <button className="msg-context-item" onClick={() => handleEdit(contextMenu.message)}>
-                                <Pencil size={15} />
-                                Edit
+                            <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-content-primary transition-colors hover:bg-surface-hover" onClick={() => handleEdit(contextMenu.message)}>
+                                <Pencil size={15} /> Edit
                             </button>
                         )}
 
                         {/* Delete for me */}
-                        <button className="msg-context-item msg-context-item-danger" onClick={() => handleDeleteForSelf(contextMenu.message)}>
-                            <Trash2 size={15} />
-                            Delete for me
+                        <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-status-error transition-colors hover:bg-status-error/10" onClick={() => handleDeleteForSelf(contextMenu.message)}>
+                            <Trash2 size={15} /> Delete for me
                         </button>
 
                         {/* Delete for everyone (own messages, within window) */}
                         {canDeleteForEveryone(contextMenu.message) && (
-                            <button className="msg-context-item msg-context-item-danger" onClick={() => handleDeleteForEveryone(contextMenu.message)}>
-                                <Trash2 size={15} />
-                                Delete for everyone
+                            <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-status-error transition-colors hover:bg-status-error/10" onClick={() => handleDeleteForEveryone(contextMenu.message)}>
+                                <Trash2 size={15} /> Delete for everyone
                             </button>
                         )}
                     </div>
@@ -873,21 +793,21 @@ const ChatWindow = ({ onBack }) => {
 
             {/* ── Reply Preview Bar ──────────────────────────── */}
             {replyingTo && (
-                <div className="reply-preview-bar">
-                    <div className="reply-preview-bar-left">
-                        <CornerUpRight size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
-                        <div className="reply-preview-bar-content">
-                            <span className="reply-preview-bar-name">
+                <div className="flex items-center justify-between border-t border-border bg-surface-bg px-4 py-2">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                        <CornerUpRight size={16} className="shrink-0 text-accent" />
+                        <div className="flex flex-col overflow-hidden text-sm">
+                            <span className="font-semibold text-content-primary">
                                 {replyingTo.sender?.displayName || "Unknown"}
                             </span>
-                            <span className="reply-preview-bar-text">
+                            <span className="truncate text-content-secondary">
                                 {replyingTo.content?.length > 80
                                     ? replyingTo.content.substring(0, 80) + "..."
                                     : replyingTo.content || "Attached Media"}
                             </span>
                         </div>
                     </div>
-                    <button className="reply-preview-bar-close" onClick={cancelReply}>
+                    <button className="rounded-lg p-1.5 text-content-muted hover:bg-surface-hover" onClick={cancelReply}>
                         <X size={16} />
                     </button>
                 </div>
@@ -896,20 +816,20 @@ const ChatWindow = ({ onBack }) => {
             {/* ── Lightbox ───────────────────────────────────── */}
             {lightboxMedia && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 animate-fade-in"
                     onClick={() => setLightboxMedia(null)}
                 >
                     <button
-                        className="absolute top-4 right-4 text-white hover:text-gray-300 p-2"
+                        className="absolute right-4 top-4 p-2 text-white/50 hover:text-white"
                         onClick={() => setLightboxMedia(null)}
                     >
                         <X size={24} />
                     </button>
-                    <div className="max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                    <div className="max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
                         {lightboxMedia.fileType === "video" ? (
-                            <video src={lightboxMedia.fileUrl} controls autoPlay className="max-w-full max-h-[90vh] rounded" />
+                            <video src={lightboxMedia.fileUrl} controls autoPlay className="max-h-[90vh] max-w-full rounded-xl" />
                         ) : (
-                            <img src={lightboxMedia.fileUrl} alt="expanded media" className="max-w-full max-h-[90vh] rounded object-contain" />
+                            <img src={lightboxMedia.fileUrl} alt="expanded media" className="max-h-[90vh] max-w-full rounded-xl object-contain" />
                         )}
                     </div>
                 </div>
@@ -917,12 +837,12 @@ const ChatWindow = ({ onBack }) => {
 
             {/* ── Edit Mode Bar ──────────────────────────────── */}
             {editingMessage && (
-                <div className="edit-mode-bar">
-                    <div className="edit-mode-bar-left">
-                        <Pencil size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
-                        <span className="edit-mode-bar-label">Editing message</span>
+                <div className="flex items-center justify-between border-t border-border bg-surface-bg px-4 py-2">
+                    <div className="flex items-center gap-2">
+                        <Pencil size={16} className="shrink-0 text-accent" />
+                        <span className="text-sm font-medium text-content-primary">Editing message</span>
                     </div>
-                    <button className="reply-preview-bar-close" onClick={handleCancelEdit}>
+                    <button className="rounded-lg p-1.5 text-content-muted hover:bg-surface-hover" onClick={handleCancelEdit}>
                         <X size={16} />
                     </button>
                 </div>
@@ -930,19 +850,19 @@ const ChatWindow = ({ onBack }) => {
 
             {/* ── File Preview Pre-Send ──────────────────────── */}
             {filePreview && (
-                <div className="px-4 py-2 border-t" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-secondary)" }}>
+                <div className="border-t border-border bg-surface-panel px-4 py-2">
                     <div className="relative inline-block">
                         {selectedFile?.type.startsWith("video/") ? (
-                            <div className="w-20 h-20 rounded-lg bg-black flex items-center justify-center relative overflow-hidden">
-                                <FileVideo size={32} className="text-gray-400 opacity-50 absolute" />
-                                <video src={filePreview} className="w-full h-full object-cover z-10" />
+                            <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg bg-black">
+                                <FileVideo size={32} className="absolute text-white/50" />
+                                <video src={filePreview} className="z-10 h-full w-full object-cover" />
                             </div>
                         ) : (
-                            <img src={filePreview} alt="preview" className="w-20 h-20 rounded-lg object-cover" />
+                            <img src={filePreview} alt="preview" className="h-20 w-20 rounded-lg object-cover" />
                         )}
                         <button
                             onClick={clearSelectedFile}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 z-20"
+                            className="absolute -right-2 -top-2 z-20 rounded-full bg-status-error p-1 text-white shadow-md hover:bg-red-600"
                         >
                             <X size={14} />
                         </button>
@@ -952,7 +872,7 @@ const ChatWindow = ({ onBack }) => {
 
             {/* ── Smart Replies ──────────────────────────────── */}
             {smartReplies.length > 0 && !isVoiceRecording && !loadingReplies && (
-                <div className="px-4 py-3 flex flex-wrap gap-2 justify-end" style={{ backgroundColor: "var(--bg-chat)" }}>
+                <div className="flex flex-wrap justify-end gap-2 bg-surface-bg px-4 py-3">
                     {smartReplies.map((reply, idx) => (
                         <button
                             key={idx}
@@ -960,20 +880,7 @@ const ChatWindow = ({ onBack }) => {
                                 sendMessage(reply);
                                 setSmartReplies([]);
                             }}
-                            className="px-3 py-1.5 rounded-full text-sm font-medium transition-fast flex items-center gap-1.5"
-                            style={{
-                                backgroundColor: "var(--bg-secondary)",
-                                color: "var(--accent)",
-                                border: "1px solid var(--border)"
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = "var(--accent)";
-                                e.currentTarget.style.color = "#fff";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
-                                e.currentTarget.style.color = "var(--accent)";
-                            }}
+                            className="flex items-center gap-1.5 rounded-full border border-border bg-surface-elevated px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent hover:text-white"
                         >
                             <Sparkles size={14} />
                             {reply}
@@ -983,10 +890,7 @@ const ChatWindow = ({ onBack }) => {
             )}
 
             {/* ── Message Input ──────────────────────────────── */}
-            <div
-                className="flex items-center gap-3 px-4 py-3 border-t"
-                style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-secondary)" }}
-            >
+            <div className="flex items-center gap-3 border-t border-border bg-surface-panel px-4 py-3">
                 {isVoiceRecording ? (
                     <VoiceRecorder
                         onSend={handleVoiceSend}
@@ -996,8 +900,7 @@ const ChatWindow = ({ onBack }) => {
                     <form onSubmit={handleSend} className="flex flex-1 items-center gap-3">
                         <button
                             type="button"
-                            className="p-2 rounded-lg transition-fast flex-shrink-0 hover:bg-black/10"
-                            style={{ color: "var(--text-muted)" }}
+                            className="shrink-0 rounded-lg p-2 text-content-muted transition-colors hover:bg-surface-hover"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isBlocked || editingMessage || isUploading}
                         >
@@ -1013,19 +916,16 @@ const ChatWindow = ({ onBack }) => {
 
                         <button
                             type="button"
-                            className="p-2 rounded-lg transition-fast flex-shrink-0"
-                            style={{ color: "var(--text-muted)" }}
+                            className="shrink-0 rounded-lg p-2 text-content-muted transition-colors hover:bg-surface-hover"
                             disabled={isBlocked || editingMessage || isUploading}
                             onClick={() => setIsVoiceRecording(true)}
                         >
                             <Mic size={20} />
                         </button>
 
-                        {/* Phase 14: Writing Tools */}
                         <button
                             type="button"
-                            className="p-2 rounded-lg transition-fast flex-shrink-0"
-                            style={{ color: "var(--accent)" }}
+                            className="shrink-0 rounded-lg p-2 text-accent transition-colors hover:bg-surface-hover"
                             disabled={isBlocked || isUploading}
                             onClick={() => setShowWritingTools(true)}
                             title="AI Writing Tools"
@@ -1033,42 +933,46 @@ const ChatWindow = ({ onBack }) => {
                             <Wand2 size={20} />
                         </button>
 
-                        <button
-                            type="button"
-                            className="p-2 rounded-lg transition-fast flex-shrink-0"
-                            style={{ color: "var(--text-muted)" }}
-                        >
-                            <Smile size={20} />
-                        </button>
+                        <div className="relative flex items-center justify-center" ref={emojiPickerRef}>
+                            <button
+                                type="button"
+                                className="shrink-0 rounded-lg p-2 text-content-muted transition-colors hover:bg-surface-hover"
+                                onClick={() => setShowEmojiPicker((prev) => !prev)}
+                                disabled={isBlocked || isUploading}
+                            >
+                                <Smile size={20} />
+                            </button>
 
-                        <input
+                            {showEmojiPicker && (
+                                <div className="absolute bottom-full left-0 mb-3 z-50 animate-fade-in shadow-elevated rounded-lg overflow-hidden border border-border">
+                                    <EmojiPicker
+                                        theme="dark"
+                                        onEmojiClick={(emojiData) => {
+                                            setInput((prev) => prev + emojiData.emoji);
+                                        }}
+                                        style={{ backgroundColor: "var(--bg-surface-panel)", border: "none" }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <Input
                             ref={inputRef}
                             type="text"
                             value={input}
                             onChange={handleInputChange}
                             placeholder={isBlocked ? "You blocked this user" : editingMessage ? "Edit your message..." : "Type a message..."}
                             disabled={isBlocked}
-                            className="flex-1 py-2.5 px-4 rounded-xl text-sm outline-none"
-                            style={{
-                                backgroundColor: "var(--bg-input)",
-                                color: "var(--text-primary)",
-                                border: editingMessage ? "1px solid var(--accent)" : "1px solid var(--border)",
-                                opacity: isBlocked ? 0.5 : 1,
-                            }}
+                            className={cn("flex-1", isBlocked && "opacity-50")}
                         />
 
-                        <button
+                        <Button
                             type="submit"
                             disabled={(!input.trim() && !selectedFile) || isBlocked || isUploading}
-                            className="p-2.5 rounded-xl transition-fast flex-shrink-0"
-                            style={{
-                                backgroundColor: (input.trim() || selectedFile) && !isBlocked ? "var(--accent)" : "var(--bg-input)",
-                                color: (input.trim() || selectedFile) && !isBlocked ? "#fff" : "var(--text-muted)",
-                                cursor: (input.trim() || selectedFile) && !isBlocked && !isUploading ? "pointer" : "default",
-                            }}
+                            className="shrink-0"
                         >
                             {isUploading ? <Loader2 size={18} className="animate-spin" /> : editingMessage ? <Check size={18} /> : <Send size={18} />}
-                        </button>
+                        </Button>
                     </form>
                 )}
             </div>

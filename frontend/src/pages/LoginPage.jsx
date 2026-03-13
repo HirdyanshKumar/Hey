@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { LogIn, Mail, Lock, Eye, EyeOff, MessageCircle, Loader2 } from "lucide-react";
+import { LogIn, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Card } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { VibeLineLogo } from "../components/ui/vibeline-logo";
 
 const LoginPage = () => {
     const [email, setEmail] = useState("");
@@ -26,83 +30,85 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="auth-container">
-            <div className="auth-card">
+        <main className="flex min-h-screen w-full items-center justify-center p-4">
+            <Card className="w-full max-w-md animate-fade-in p-8">
                 {/* Logo / Brand */}
-                <div className="auth-brand">
-                    <div className="auth-logo">
-                        <MessageCircle size={32} />
+                <div className="mb-8 flex flex-col items-center justify-center gap-4 text-center">
+                    <VibeLineLogo size="md" />
+                    <div>
+                        <h1 className="text-2xl font-semibold text-content-primary">Welcome back</h1>
+                        <p className="mt-1 text-sm text-content-secondary">Sign in to continue to Hey</p>
                     </div>
-                    <h1 className="auth-title">Welcome back</h1>
-                    <p className="auth-subtitle">Sign in to continue to Hey</p>
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="auth-form">
-                    <div className="auth-field">
-                        <label htmlFor="email" className="auth-label">Email</label>
-                        <div className="auth-input-wrapper">
-                            <Mail size={18} className="auth-input-icon" />
-                            <input
+                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-2">
+                        <label htmlFor="email" className="text-sm font-medium text-content-secondary">Email</label>
+                        <div className="relative flex items-center">
+                            <Mail size={16} className="absolute left-3 text-content-muted" />
+                            <Input
                                 id="email"
                                 type="email"
                                 placeholder="you@example.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="auth-input"
+                                className="pl-9"
                                 required
                                 autoComplete="email"
                             />
                         </div>
                     </div>
 
-                    <div className="auth-field">
-                        <label htmlFor="password" className="auth-label">Password</label>
-                        <div className="auth-input-wrapper">
-                            <Lock size={18} className="auth-input-icon" />
-                            <input
+                    <div className="flex flex-col gap-2">
+                        <label htmlFor="password" className="text-sm font-medium text-content-secondary">Password</label>
+                        <div className="relative flex items-center">
+                            <Lock size={16} className="absolute left-3 text-content-muted" />
+                            <Input
                                 id="password"
                                 type={showPassword ? "text" : "password"}
                                 placeholder="Enter your password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="auth-input"
+                                className="pl-9 pr-9"
                                 required
                                 autoComplete="current-password"
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="auth-toggle-password"
+                                className="absolute right-3 text-content-muted transition-colors hover:text-content-secondary"
                             >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
                     </div>
 
-                    <button
+                    <Button
                         type="submit"
-                        className="auth-submit"
+                        className="mt-2 w-full"
                         disabled={isLoading || !email || !password}
                     >
                         {isLoading ? (
-                            <Loader2 size={20} className="auth-spinner" />
+                            <Loader2 size={16} className="animate-spin" />
                         ) : (
                             <>
-                                <LogIn size={18} />
+                                <LogIn size={16} className="mr-2" />
                                 Sign In
                             </>
                         )}
-                    </button>
+                    </Button>
                 </form>
 
                 {/* Footer */}
-                <p className="auth-footer">
+                <p className="mt-6 text-center text-sm text-content-secondary">
                     Don't have an account?{" "}
-                    <Link to="/register" className="auth-link">Create one</Link>
+                    <Link to="/register" className="font-medium text-accent transition-colors hover:text-accent-hover">
+                        Create one
+                    </Link>
                 </p>
-            </div>
-        </div>
+            </Card>
+        </main>
     );
 };
 

@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { UserPlus, Mail, Lock, Eye, EyeOff, User, MessageCircle, Loader2 } from "lucide-react";
+import { UserPlus, Mail, Lock, Eye, EyeOff, User, Loader2 } from "lucide-react";
+import { Card } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { VibeLineLogo } from "../components/ui/vibeline-logo";
 
 const RegisterPage = () => {
     const [displayName, setDisplayName] = useState("");
@@ -53,121 +57,123 @@ const RegisterPage = () => {
     };
 
     return (
-        <div className="auth-container">
-            <div className="auth-card">
+        <main className="flex min-h-screen w-full items-center justify-center p-4">
+            <Card className="w-full max-w-md animate-fade-in p-8">
                 {/* Logo / Brand */}
-                <div className="auth-brand">
-                    <div className="auth-logo">
-                        <MessageCircle size={32} />
+                <div className="mb-8 flex flex-col items-center justify-center gap-4 text-center">
+                    <VibeLineLogo size="md" />
+                    <div>
+                        <h1 className="text-2xl font-semibold text-content-primary">Create account</h1>
+                        <p className="mt-1 text-sm text-content-secondary">Join Hey and start chatting</p>
                     </div>
-                    <h1 className="auth-title">Create account</h1>
-                    <p className="auth-subtitle">Join Hey and start chatting</p>
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="auth-form">
-                    <div className="auth-field">
-                        <label htmlFor="displayName" className="auth-label">Display Name</label>
-                        <div className="auth-input-wrapper">
-                            <User size={18} className="auth-input-icon" />
-                            <input
+                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-2">
+                        <label htmlFor="displayName" className="text-sm font-medium text-content-secondary">Display Name</label>
+                        <div className="relative flex items-center">
+                            <User size={16} className="absolute left-3 text-content-muted" />
+                            <Input
                                 id="displayName"
                                 type="text"
                                 placeholder="Your name"
                                 value={displayName}
                                 onChange={(e) => setDisplayName(e.target.value)}
-                                className="auth-input"
+                                className="pl-9"
                                 required
                                 autoComplete="name"
                             />
                         </div>
-                        {errors.displayName && <span className="auth-error">{errors.displayName}</span>}
+                        {errors.displayName && <span className="text-xs text-status-error">{errors.displayName}</span>}
                     </div>
 
-                    <div className="auth-field">
-                        <label htmlFor="email" className="auth-label">Email</label>
-                        <div className="auth-input-wrapper">
-                            <Mail size={18} className="auth-input-icon" />
-                            <input
+                    <div className="flex flex-col gap-2">
+                        <label htmlFor="email" className="text-sm font-medium text-content-secondary">Email</label>
+                        <div className="relative flex items-center">
+                            <Mail size={16} className="absolute left-3 text-content-muted" />
+                            <Input
                                 id="email"
                                 type="email"
                                 placeholder="you@example.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="auth-input"
+                                className="pl-9"
                                 required
                                 autoComplete="email"
                             />
                         </div>
-                        {errors.email && <span className="auth-error">{errors.email}</span>}
+                        {errors.email && <span className="text-xs text-status-error">{errors.email}</span>}
                     </div>
 
-                    <div className="auth-field">
-                        <label htmlFor="password" className="auth-label">Password</label>
-                        <div className="auth-input-wrapper">
-                            <Lock size={18} className="auth-input-icon" />
-                            <input
+                    <div className="flex flex-col gap-2">
+                        <label htmlFor="password" className="text-sm font-medium text-content-secondary">Password</label>
+                        <div className="relative flex items-center">
+                            <Lock size={16} className="absolute left-3 text-content-muted" />
+                            <Input
                                 id="password"
                                 type={showPassword ? "text" : "password"}
                                 placeholder="At least 6 characters"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="auth-input"
+                                className="pl-9 pr-9"
                                 required
                                 autoComplete="new-password"
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="auth-toggle-password"
+                                className="absolute right-3 text-content-muted transition-colors hover:text-content-secondary"
                             >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
-                        {errors.password && <span className="auth-error">{errors.password}</span>}
+                        {errors.password && <span className="text-xs text-status-error">{errors.password}</span>}
                     </div>
 
-                    <div className="auth-field">
-                        <label htmlFor="confirmPassword" className="auth-label">Confirm Password</label>
-                        <div className="auth-input-wrapper">
-                            <Lock size={18} className="auth-input-icon" />
-                            <input
+                    <div className="flex flex-col gap-2">
+                        <label htmlFor="confirmPassword" className="text-sm font-medium text-content-secondary">Confirm Password</label>
+                        <div className="relative flex items-center">
+                            <Lock size={16} className="absolute left-3 text-content-muted" />
+                            <Input
                                 id="confirmPassword"
                                 type={showPassword ? "text" : "password"}
                                 placeholder="Repeat your password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="auth-input"
+                                className="pl-9 pr-9"
                                 required
                                 autoComplete="new-password"
                             />
                         </div>
-                        {errors.confirmPassword && <span className="auth-error">{errors.confirmPassword}</span>}
+                        {errors.confirmPassword && <span className="text-xs text-status-error">{errors.confirmPassword}</span>}
                     </div>
 
-                    <button
+                    <Button
                         type="submit"
-                        className="auth-submit"
+                        className="mt-2 w-full"
                         disabled={isLoading || !email || !password || !displayName || !confirmPassword}
                     >
                         {isLoading ? (
-                            <Loader2 size={20} className="auth-spinner" />
+                            <Loader2 size={16} className="animate-spin" />
                         ) : (
                             <>
-                                <UserPlus size={18} />
+                                <UserPlus size={16} className="mr-2" />
                                 Create Account
                             </>
                         )}
-                    </button>
+                    </Button>
                 </form>
 
                 {/* Footer */}
-                <p className="auth-footer">
+                <p className="mt-6 text-center text-sm text-content-secondary">
                     Already have an account?{" "}
-                    <Link to="/login" className="auth-link">Sign in</Link>
+                    <Link to="/login" className="font-medium text-accent transition-colors hover:text-accent-hover">
+                        Sign in
+                    </Link>
                 </p>
-            </div>
-        </div>
+            </Card>
+        </main>
     );
 };
 

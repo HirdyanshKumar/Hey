@@ -5,6 +5,7 @@ import ChatWindow from "./ChatWindow";
 import { SocketProvider } from "../context/SocketContext";
 import { ChatProvider } from "../context/ChatContext";
 import { useChat } from "../context/ChatContext";
+import { cn } from "../lib/utils";
 
 const ChatContent = () => {
     const { selectedConversation, selectConversation } = useChat();
@@ -21,14 +22,12 @@ const ChatContent = () => {
     };
 
     return (
-        <div className="chat-layout" style={{ backgroundColor: "var(--bg-primary)" }}>
-            {/* Sidebar — hidden on mobile when a conversation is selected */}
-            <div className={`chat-layout-sidebar ${isMobile && selectedConversation ? "chat-layout-hidden" : ""}`}>
+        <div className="flex h-[100dvh] w-full overflow-hidden bg-surface-bg">
+            <div className={cn("flex h-full w-full flex-col border-r border-border bg-surface-panel transition-all md:w-80 md:flex-none lg:w-96", (isMobile && selectedConversation) && "hidden")}>
                 <Sidebar />
             </div>
 
-            {/* Main Chat Area — hidden on mobile when no conversation is selected */}
-            <main className={`chat-layout-main ${isMobile && !selectedConversation ? "chat-layout-hidden" : ""}`}>
+            <main className={cn("flex h-full flex-1 flex-col overflow-hidden bg-surface-bg transition-all", (isMobile && !selectedConversation) && "hidden")}>
                 {selectedConversation ? (
                     <ChatWindow onBack={handleBack} />
                 ) : (

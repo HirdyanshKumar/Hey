@@ -18,6 +18,11 @@ import {
     Languages,
 } from "lucide-react";
 
+import { Card } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { Avatar } from "../components/ui/avatar";
+
 const ProfilePage = () => {
     const { user, updateUser } = useAuth();
     const { isConnected } = useSocket();
@@ -49,21 +54,6 @@ const ProfilePage = () => {
         { code: "it", name: "Italian" },
     ];
 
-    // Generate initials
-    const getInitials = (name) =>
-        name
-            ?.split(" ")
-            .map((n) => n[0])
-            .join("")
-            .toUpperCase() || "?";
-
-    const getAvatarColor = (name) => {
-        const colors = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#14b8a6"];
-        let hash = 0;
-        for (let i = 0; i < (name?.length || 0); i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        return colors[Math.abs(hash) % colors.length];
-    };
-
     const handleSaveProfile = async () => {
         if (displayName.trim().length < 2) {
             toast.error("Display name must be at least 2 characters.");
@@ -86,7 +76,6 @@ const ProfilePage = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Client-side validation
         if (file.size > 5 * 1024 * 1024) {
             toast.error("Image must be under 5 MB.");
             return;
@@ -124,46 +113,38 @@ const ProfilePage = () => {
         : "—";
 
     return (
-        <div className="profile-page">
+        <div className="flex min-h-screen w-full flex-col items-center bg-surface-bg p-4 overflow-y-auto">
             {/* Header */}
-            <div className="profile-header">
-                <button className="profile-back-btn" onClick={() => navigate("/")}>
-                    <ArrowLeft size={20} />
+            <div className="flex w-full max-w-lg items-center justify-between pb-6 pt-2">
+                <button
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface-elevated text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    onClick={() => navigate("/")}
+                >
+                    <ArrowLeft size={18} />
                 </button>
-                <h1 className="profile-header-title">Profile</h1>
-                <div style={{ width: 36 }} />
+                <h1 className="text-xl font-bold text-content-primary">Profile</h1>
+                <div className="w-9" />
             </div>
 
             {/* Card */}
-            <div className="profile-card">
-                {/* Avatar */}
-                <div className="profile-avatar-section">
-                    <div className="profile-avatar-wrapper">
-                        {user?.avatarUrl ? (
-                            <img
-                                src={user.avatarUrl}
-                                alt={user.displayName}
-                                className="profile-avatar-img"
-                            />
-                        ) : (
-                            <div
-                                className="profile-avatar-placeholder"
-                                style={{ backgroundColor: getAvatarColor(user?.displayName) }}
-                            >
-                                {getInitials(user?.displayName)}
-                            </div>
-                        )}
-
-                        {/* Upload overlay */}
+            <Card className="w-full max-w-lg animate-fade-in p-8">
+                {/* Avatar Section */}
+                <div className="mb-8 flex flex-col items-center gap-3">
+                    <div className="group relative h-24 w-24">
+                        <Avatar
+                            name={user?.displayName || "?"}
+                            src={user?.avatarUrl}
+                            className="h-24 w-24 border-[3px] border-border text-3xl"
+                        />
                         <button
-                            className="profile-avatar-overlay"
+                            className="absolute inset-0 flex items-center justify-center rounded-full border-none bg-black/50 text-white opacity-0 transition-opacity disabled:opacity-50 group-hover:opacity-100"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploadingAvatar}
                         >
                             {uploadingAvatar ? (
-                                <Loader2 size={20} className="auth-spinner" />
+                                <Loader2 size={24} className="animate-spin" />
                             ) : (
-                                <Camera size={20} />
+                                <Camera size={24} />
                             )}
                         </button>
                         <input
@@ -176,78 +157,80 @@ const ProfilePage = () => {
                     </div>
 
                     {/* Online status */}
-                    <div className="profile-status-badge">
+                    <div className="flex items-center gap-2 text-sm font-medium">
                         <div
-                            className="profile-status-dot"
-                            style={{
-                                backgroundColor: isConnected ? "var(--online)" : "var(--text-muted)",
-                            }}
+                            className={`h-2 w-2 rounded-full ${isConnected ? "bg-status-success" : "bg-content-muted"}`}
                         />
-                        <span style={{ color: isConnected ? "var(--online)" : "var(--text-muted)" }}>
+                        <span className={isConnected ? "text-status-success" : "text-content-muted"}>
                             {isConnected ? "Online" : "Offline"}
                         </span>
                     </div>
                 </div>
 
                 {/* Info Fields */}
-                <div className="profile-fields">
+                <div className="mb-6 flex flex-col gap-6">
                     {/* Display Name */}
-                    <div className="profile-field">
-                        <label className="profile-field-label">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
                             <User size={14} />
                             Display Name
                         </label>
                         {isEditing ? (
-                            <input
+                            <Input
                                 type="text"
                                 value={displayName}
                                 onChange={(e) => setDisplayName(e.target.value)}
-                                className="profile-field-input"
                                 maxLength={50}
                                 autoFocus
                             />
                         ) : (
-                            <p className="profile-field-value">{user?.displayName}</p>
+                            <div className="flex min-h-10 items-center rounded-md bg-surface-elevated px-3 py-2 text-sm text-content-primary">
+                                <p>{user?.displayName}</p>
+                            </div>
                         )}
                     </div>
 
                     {/* Bio */}
-                    <div className="profile-field">
-                        <label className="profile-field-label">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
                             <Edit3 size={14} />
                             Bio
                         </label>
                         {isEditing ? (
-                            <textarea
-                                value={bio}
-                                onChange={(e) => setBio(e.target.value)}
-                                className="profile-field-textarea"
-                                maxLength={200}
-                                rows={3}
-                                placeholder="Tell something about yourself..."
-                            />
+                            <>
+                                <textarea
+                                    value={bio}
+                                    onChange={(e) => setBio(e.target.value)}
+                                    className="flex w-full resize-y rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-content-primary transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                                    maxLength={200}
+                                    rows={3}
+                                    placeholder="Tell something about yourself..."
+                                />
+                                <span className="mt-1 block text-right text-[11px] text-content-muted">
+                                    {bio.length}/200
+                                </span>
+                            </>
                         ) : (
-                            <p className="profile-field-value">
-                                {user?.bio || <span style={{ color: "var(--text-muted)" }}>No bio yet</span>}
-                            </p>
-                        )}
-                        {isEditing && (
-                            <span className="profile-char-count">{bio.length}/200</span>
+                            <div className="flex min-h-10 items-center rounded-md bg-surface-elevated px-3 py-2 text-sm text-content-primary">
+                                <p>
+                                    {user?.bio || <span className="text-content-muted">No bio yet</span>}
+                                </p>
+                            </div>
                         )}
                     </div>
 
-                    {/* Read Receipts Toggle */}
-                    <div className="profile-field">
-                        <label className="profile-field-label">
+                    {/* Read Receipts */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
                             <Eye size={14} />
                             Read Receipts
                         </label>
-                        <div className="flex items-center justify-between">
-                            <p className="text-xs" style={{ color: "var(--text-muted)", maxWidth: "220px" }}>
+                        <div className="flex items-center justify-between rounded-md bg-surface-elevated px-3 py-3">
+                            <p className="max-w-[220px] text-xs text-content-muted">
                                 When enabled, others can see when you've read their messages
                             </p>
                             <button
-                                className={`toggle-switch ${readReceipts ? 'toggle-switch-on' : 'toggle-switch-off'}`}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-bg disabled:cursor-not-allowed disabled:opacity-50 ${readReceipts ? "bg-accent" : "bg-border-strong"}`}
                                 onClick={async () => {
                                     setTogglingReceipts(true);
                                     try {
@@ -264,23 +247,25 @@ const ProfilePage = () => {
                                 }}
                                 disabled={togglingReceipts}
                             >
-                                <span className="toggle-switch-thumb" />
+                                <span
+                                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${readReceipts ? "translate-x-4" : "translate-x-0"}`}
+                                />
                             </button>
                         </div>
                     </div>
 
-                    {/* Phase 14: Preferred Language */}
-                    <div className="profile-field">
-                        <label className="profile-field-label">
+                    {/* Preferred Language */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
                             <Languages size={14} />
                             Preferred Language
                         </label>
-                        <div className="flex items-center justify-between">
-                            <p className="text-xs" style={{ color: "var(--text-muted)", maxWidth: "220px" }}>
+                        <div className="flex items-center justify-between rounded-md bg-surface-elevated px-3 py-2.5">
+                            <p className="max-w-[220px] text-xs text-content-muted">
                                 Messages will be translated to this language
                             </p>
                             <select
-                                className="profile-language-select"
+                                className="rounded-md border border-border bg-surface-bg px-2 py-1 text-sm text-content-primary focus:outline-none focus:ring-1 focus:ring-accent"
                                 value={preferredLanguage}
                                 disabled={savingLanguage}
                                 onChange={async (e) => {
@@ -305,61 +290,50 @@ const ProfilePage = () => {
                         </div>
                     </div>
 
-                    {/* Email (read-only) */}
-                    <div className="profile-field">
-                        <label className="profile-field-label">
+                    {/* Email */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
                             <Mail size={14} />
                             Email
                         </label>
-                        <p className="profile-field-value">{user?.email}</p>
+                        <div className="flex items-center rounded-md bg-surface-elevated px-3 py-2.5 text-sm text-content-primary">
+                            <p>{user?.email}</p>
+                        </div>
                     </div>
 
                     {/* Member Since */}
-                    <div className="profile-field">
-                        <label className="profile-field-label">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
                             <Calendar size={14} />
                             Member Since
                         </label>
-                        <p className="profile-field-value">{formattedDate}</p>
+                        <div className="flex items-center rounded-md bg-surface-elevated px-3 py-2.5 text-sm text-content-primary">
+                            <p>{formattedDate}</p>
+                        </div>
                     </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="profile-actions">
+                {/* Actions */}
+                <div className="flex justify-end gap-3 pt-2">
                     {isEditing ? (
                         <>
-                            <button
-                                className="profile-btn profile-btn-secondary"
-                                onClick={handleCancelEdit}
-                                disabled={saving}
-                            >
+                            <Button variant="secondary" onClick={handleCancelEdit} disabled={saving}>
                                 <X size={16} />
                                 Cancel
-                            </button>
-                            <button
-                                className="profile-btn profile-btn-primary"
-                                onClick={handleSaveProfile}
-                                disabled={saving}
-                            >
-                                {saving ? (
-                                    <Loader2 size={16} className="auth-spinner" />
-                                ) : (
-                                    <Save size={16} />
-                                )}
+                            </Button>
+                            <Button onClick={handleSaveProfile} disabled={saving}>
+                                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                                 {saving ? "Saving…" : "Save Changes"}
-                            </button>
+                            </Button>
                         </>
                     ) : (
-                        <button
-                            className="profile-btn profile-btn-primary"
-                            onClick={() => setIsEditing(true)}
-                        >
+                        <Button onClick={() => setIsEditing(true)}>
                             <Edit3 size={16} />
                             Edit Profile
-                        </button>
+                        </Button>
                     )}
                 </div>
-            </div>
+            </Card>
         </div>
     );
 };

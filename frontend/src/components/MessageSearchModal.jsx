@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search, X, Loader2, Calendar } from "lucide-react";
+import { Search, X, Calendar, FileImage, MessageSquare } from "lucide-react";
 import { searchMessagesAPI } from "../utils/api";
 import { useChat } from "../context/ChatContext";
+import { Input } from "./ui/input";
+import { Spinner } from "./ui/spinner";
+import { cn } from "../lib/utils";
 
 const MessageSearchModal = ({ onClose }) => {
     const [query, setQuery] = useState("");
@@ -70,133 +73,163 @@ const MessageSearchModal = ({ onClose }) => {
     };
 
     return (
-        <div className="new-chat-overlay" onClick={onClose}>
-            <div className="new-chat-modal" onClick={(e) => e.stopPropagation()} style={{ width: "480px", maxWidth: "90vw", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+        <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in" 
+            onClick={onClose}
+        >
+            <div 
+                className="flex w-full max-w-[540px] max-h-[85vh] flex-col overflow-hidden rounded-[28px] border border-border bg-surface-panel shadow-elevated" 
+                onClick={(e) => e.stopPropagation()} 
+            >
                 {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+                <div className="flex items-center justify-between border-b border-border px-6 py-5 sm:px-8">
+                    <h3 className="text-xl font-bold tracking-tight text-content-primary">
                         Search Messages
                     </h3>
                     <button
-                        className="p-1.5 rounded-lg transition-fast"
-                        style={{ color: "var(--text-muted)" }}
+                        className="rounded-full bg-surface-secondary p-2 text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
                         onClick={onClose}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                     >
-                        <X size={18} />
+                        <X size={20} strokeWidth={2.5} />
                     </button>
                 </div>
 
-                {/* Search Input */}
-                <div
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg mb-3"
-                    style={{ backgroundColor: "var(--bg-input)", border: "1px solid var(--border)" }}
-                >
-                    <Search size={16} style={{ color: "var(--text-muted)" }} />
-                    <input
-                        type="text"
-                        placeholder="Search for messages across all chats..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="bg-transparent border-none outline-none text-sm flex-1"
-                        style={{ color: "var(--text-primary)" }}
-                        autoFocus
-                    />
-                </div>
-
-                {/* Filters Row */}
-                <div className="flex flex-col gap-2 mb-3">
-                    <div className="flex gap-2">
-                        <div className="flex-1 flex flex-col">
-                            <label className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>From Date</label>
-                            <div className="flex items-center border rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
-                                <Calendar size={14} style={{ color: "var(--text-muted)", marginRight: '6px' }} />
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="bg-transparent border-none outline-none text-xs flex-1"
-                                    style={{ color: "var(--text-primary)" }}
-                                />
-                            </div>
-                        </div>
-                        <div className="flex-1 flex flex-col">
-                            <label className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>To Date</label>
-                            <div className="flex items-center border rounded-lg px-2 py-1.5" style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
-                                <Calendar size={14} style={{ color: "var(--text-muted)", marginRight: '6px' }} />
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="bg-transparent border-none outline-none text-xs flex-1"
-                                    style={{ color: "var(--text-primary)" }}
-                                />
-                            </div>
+                {/* Content */}
+                <div className="flex flex-col gap-5 border-b border-border/50 bg-surface-bg px-6 py-5 sm:px-8">
+                    {/* Search Field */}
+                    <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
+                            <Search size={14} />
+                            Search Query
+                        </label>
+                        <div className="relative flex items-center">
+                            <Search size={16} className="absolute left-3.5 text-content-muted" />
+                            <Input
+                                type="text"
+                                placeholder="Search across all conversations..."
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                className="pl-10"
+                                autoFocus
+                            />
                         </div>
                     </div>
-                    <label className="flex items-center gap-2 cursor-pointer mt-1 w-max">
-                        <input
-                            type="checkbox"
-                            checked={hasMedia}
-                            onChange={(e) => setHasMedia(e.target.checked)}
-                            className="w-4 h-4 rounded text-blue-500"
-                        />
-                        <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
-                            Only show messages with media
-                        </span>
-                    </label>
+
+                    {/* Filters Row */}
+                    <div className="flex flex-col gap-4 sm:flex-row">
+                        <div className="flex flex-1 flex-col gap-2">
+                            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
+                                <Calendar size={14} />
+                                From Date
+                            </label>
+                            <Input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full"
+                                style={{ colorScheme: "dark" }}
+                            />
+                        </div>
+                        <div className="flex flex-1 flex-col gap-2">
+                            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-content-muted">
+                                <Calendar size={14} />
+                                To Date
+                            </label>
+                            <Input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full"
+                                style={{ colorScheme: "dark" }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Media Toggle */}
+                    <div 
+                        className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-panel p-4 transition-colors hover:border-accent/50 hover:bg-surface-hover" 
+                        onClick={() => setHasMedia(!hasMedia)}
+                    >
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-semibold text-content-primary">Media Only</span>
+                            <span className="text-xs text-content-muted">Only show messages with attachments</span>
+                        </div>
+                        <button
+                            type="button"
+                            className={cn(
+                                "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-bg",
+                                hasMedia ? "bg-accent" : "bg-surface-elevated"
+                            )}
+                            role="switch"
+                            aria-checked={hasMedia}
+                        >
+                            <span
+                                aria-hidden="true"
+                                className={cn(
+                                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                    hasMedia ? "translate-x-5" : "translate-x-0"
+                                )}
+                            />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Results List */}
-                <div className="flex-1 overflow-y-auto mt-2" style={{ minHeight: "200px" }}>
+                <div className="flex-1 overflow-y-auto bg-surface-bg px-6 py-4 sm:px-8" style={{ minHeight: "300px" }}>
                     {searching ? (
-                        <div className="flex items-center justify-center py-8">
-                            <Loader2 size={24} className="auth-spinner" style={{ color: "var(--accent)" }} />
+                        <div className="flex h-full flex-col items-center justify-center gap-4 py-16">
+                            <Spinner />
+                            <p className="text-sm font-medium text-content-muted">Scanning messages...</p>
                         </div>
-                    ) : results.length === 0 && query.trim() ? (
-                        <div className="text-center py-8">
-                            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                                No matching messages found.
+                    ) : results.length === 0 && (query.trim() || startDate || endDate || hasMedia) ? (
+                        <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center text-content-muted">
+                            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-surface-elevated text-content-secondary shadow-inner">
+                                <Search size={24} strokeWidth={2} />
+                            </div>
+                            <h4 className="mb-2 text-[15px] font-semibold text-content-primary">No messages found</h4>
+                            <p className="max-w-[280px] text-sm leading-relaxed">
+                                We couldn't find anything matching your search criteria. Try adjusting your keywords or date range.
                             </p>
                         </div>
-                    ) : !query.trim() ? (
-                        <div className="text-center py-8">
-                            <Search size={32} className="mx-auto mb-2 opacity-50" style={{ color: "var(--text-muted)" }} />
-                            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                                Enter a keyword to start searching.
+                    ) : !query.trim() && !startDate && !endDate && !hasMedia ? (
+                        <div className="flex h-full flex-col items-center justify-center px-6 py-16 text-center text-content-muted">
+                            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-border bg-surface-elevated opacity-60 shadow-inner">
+                                <Search size={34} strokeWidth={1.5} />
+                            </div>
+                            <h4 className="mb-2 text-[17px] font-semibold text-content-primary">Looking for something?</h4>
+                            <p className="max-w-[280px] text-[14px] leading-relaxed">
+                                Enter a keyword to instantly search across all your personal chats and groups.
                             </p>
                         </div>
                     ) : (
-                        <div className="flex flex-col gap-2 pr-1">
+                        <div className="flex flex-col gap-3 pb-4">
                             {results.map((msg) => (
                                 <button
                                     key={msg.id}
                                     onClick={() => handleJumpToMessage(msg)}
-                                    className="w-full flex flex-col p-3 rounded-lg text-left transition-fast border"
-                                    style={{
-                                        backgroundColor: "var(--bg-secondary)",
-                                        borderColor: "var(--border)"
-                                    }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
-                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-secondary)")}
+                                    className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-border bg-surface-panel p-4 text-left transition-all hover:-translate-y-[1px] hover:border-accent hover:bg-surface-hover hover:shadow-elevated"
                                 >
-                                    <div className="flex justify-between items-center w-full mb-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
+                                    <div className="mb-2.5 flex w-full items-center justify-between">
+                                        <div className="flex min-w-0 items-center gap-2.5">
+                                            <span className="truncate text-[14px] font-bold text-content-primary">
                                                 {msg.sender?.displayName}
                                             </span>
-                                            <span className="text-xs py-0.5 px-1.5 rounded bg-black/20" style={{ color: "var(--text-muted)" }}>
+                                            <span className="shrink-0 rounded-md bg-surface-elevated px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-content-secondary">
                                                 in {msg.conversation?.name || (msg.conversation?.isGroup ? "Group" : "Chat")}
                                             </span>
                                         </div>
-                                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                                        <span className="ml-3 shrink-0 text-[11px] font-medium text-content-muted">
                                             {formatDate(msg.createdAt)}
                                         </span>
                                     </div>
-                                    <p className="text-sm line-clamp-2" style={{ color: "var(--text-secondary)" }}>
-                                        {msg.content || (msg.fileType === "video" ? "📹 Video attachment" : "🖼️ Image attachment")}
-                                    </p>
+                                    <div className="flex gap-2">
+                                        <div className="mt-0.5 shrink-0 text-content-muted">
+                                            {msg.fileType ? <FileImage size={15} /> : <MessageSquare size={15} />}
+                                        </div>
+                                        <p className="line-clamp-2 text-[14px] leading-relaxed text-content-secondary">
+                                            {msg.content || (msg.fileType === "video" ? "Video attachment" : "Image attachment")}
+                                        </p>
+                                    </div>
                                 </button>
                             ))}
                         </div>

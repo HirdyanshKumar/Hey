@@ -60,12 +60,6 @@
 - **Filter by sender**, date range, and media type
 - **Jump to message** — click search results to navigate to the original message
 
-### 🔔 Notifications
-- **WhatsApp-style unread badges** — per-conversation unread message counts
-- **Toast notifications** — slide-in alerts for new messages with sender info
-- **Notification sound** — audio ping for incoming messages
-- **Bold highlighting** — unread conversations get accent-colored timestamps and bold names
-
 ### 🛡️ Privacy & Security
 - **JWT authentication** with HTTP-only cookie support
 - **User blocking** — block/unblock users, prevents messaging

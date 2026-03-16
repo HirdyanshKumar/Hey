@@ -557,7 +557,7 @@ const ChatWindow = ({ onBack }) => {
                     <div className="flex h-full items-center justify-center">
                         <div className="text-center">
                             <p className="text-sm text-content-muted">
-                                No messages yet. Say hello! 👋
+                                No messages yet. Say hello!
                             </p>
                         </div>
                     </div>
@@ -625,7 +625,7 @@ const ChatWindow = ({ onBack }) => {
                                                         </span>
                                                         <span className="truncate">
                                                             {msg.replyTo.isDeleted
-                                                                ? "🚫 This message was deleted"
+                                                                ? "This message was deleted"
                                                                 : msg.replyTo.content?.length > 60
                                                                     ? msg.replyTo.content.substring(0, 60) + "..."
                                                                     : msg.replyTo.content || "Attached Media"}
@@ -635,8 +635,11 @@ const ChatWindow = ({ onBack }) => {
                                             )}
 
                                             {/* Media Rendering */}
-                                            {msg.fileUrl && !msg.isDeleted && (
-                                                msg.fileType === "audio" ? (
+                                            {msg.fileUrl && !msg.isDeleted && (() => {
+                                                const isAudio = msg.fileType === "audio"
+                                                    || (msg.fileName && msg.fileName.startsWith("voice-note"))
+                                                    || (msg.fileType === "video" && msg.fileUrl?.includes(".webm"));
+                                                return isAudio ? (
                                                     <div className="mb-1 mt-1">
                                                         <VoiceMessage url={msg.fileUrl} isMine={isMine} />
                                                     </div>
@@ -652,12 +655,12 @@ const ChatWindow = ({ onBack }) => {
                                                             <img src={msg.fileUrl} alt={msg.fileName || "attachment"} className="h-full w-full object-cover" />
                                                         )}
                                                     </div>
-                                                )
-                                            )}
+                                                );
+                                            })()}
 
                                             {/* Message content or deleted placeholder */}
                                             {msg.isDeleted ? (
-                                                <p>🚫 This message was deleted</p>
+                                                <p>This message was deleted</p>
                                             ) : msg.content ? (
                                                 <p className="text-sm leading-relaxed">
                                                     {translations[msg.id]?.visible && !translations[msg.id]?.loading

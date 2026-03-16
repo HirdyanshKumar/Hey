@@ -38,7 +38,7 @@ router.put("/avatar", upload.single("avatar"), updateAvatar);
 // Read receipt settings
 router.put("/settings/read-receipts", updateReadReceiptsSetting);
 
-// Phase 14: Preferred language
+
 router.put("/settings/preferred-language", updatePreferredLanguage);
 
 module.exports = router;

@@ -28,12 +28,15 @@ export const ChatProvider = ({ children }) => {
     const typingTimeoutRef = useRef(null);
     const isTypingRef = useRef(false);
 
-    // ── Phase 8: Reply & Edit state ───────────────────────
+
     const [replyingTo, setReplyingTo] = useState(null);
     const [editingMessage, setEditingMessage] = useState(null);
 
-    // ── Phase 9: Message Search ───────────────────────────
+
     const [jumpToMessageId, setJumpToMessageId] = useState(null);
+
+
+    const [unreadCounts, setUnreadCounts] = useState({});
 
     const cancelReply = useCallback(() => setReplyingTo(null), []);
     const cancelEdit = useCallback(() => setEditingMessage(null), []);
@@ -77,6 +80,14 @@ export const ChatProvider = ({ children }) => {
                 socket.emit("join:conversation", { conversationId });
                 socket.emit("message:read", { conversationId });
             }
+
+            // Clear unread count for this conversation
+            setUnreadCounts((prev) => {
+                if (!prev[conversationId]) return prev;
+                const next = { ...prev };
+                delete next[conversationId];
+                return next;
+            });
         } catch (error) {
             console.error("Failed to fetch conversation:", error);
             toast.error("Failed to open conversation");
@@ -183,22 +194,20 @@ export const ChatProvider = ({ children }) => {
         stopTyping();
     }, [socket, isConnected, replyingTo, stopTyping]);
 
-    // ── Phase 8: Edit message ─────────────────────────────
+
     const editMessage = useCallback(async (messageId, content) => {
         if (!socket || !isConnected) return;
 
-        // Real-time via socket
         socket.emit("message:edit", { messageId, content });
 
-        // Clear edit state
+
         setEditingMessage(null);
     }, [socket, isConnected]);
 
-    // ── Phase 8: Delete message for self (HTTP only) ──────
+
     const deleteMessageForSelf = useCallback(async (messageId) => {
         try {
             await api.delete(`/messages/${messageId}/self`);
-            // Remove from local state immediately
             setMessages((prev) => prev.filter((m) => m.id !== messageId));
         } catch (error) {
             console.error("Failed to delete message for self:", error);
@@ -207,13 +216,13 @@ export const ChatProvider = ({ children }) => {
         }
     }, []);
 
-    // ── Phase 8: Delete message for everyone (socket) ─────
+
     const deleteMessageForEveryone = useCallback((messageId) => {
         if (!socket || !isConnected) return;
         socket.emit("message:deleteForEveryone", { messageId });
     }, [socket, isConnected]);
 
-    // Block / Unblock
+
     const blockUser = useCallback(async (targetUserId) => {
         try {
             await api.post(`/users/block/${targetUserId}`);
@@ -245,7 +254,7 @@ export const ChatProvider = ({ children }) => {
         }
     }, []);
 
-    // ── Group Functions ───────────────────────────────────
+
     const createGroup = useCallback(async (name, description, memberIds) => {
         try {
             const { data } = await api.post("/groups", { name, description, memberIds });
@@ -373,7 +382,7 @@ export const ChatProvider = ({ children }) => {
         }
     }, []);
 
-    // ── Phase 13: Start AI Chat ───────────────────────────
+
     const startAIChat = useCallback(async () => {
         try {
             const { createAIBotConversationAPI } = await import("../utils/api");
@@ -399,6 +408,25 @@ export const ChatProvider = ({ children }) => {
         }
     }, [selectConversation, socket, isConnected]);
 
+
+    const deleteConversation = useCallback(async (conversationId) => {
+        try {
+            await api.delete(`/conversations/${conversationId}`);
+            setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+            if (selectedConvIdRef.current === conversationId) {
+                setSelectedConversation(null);
+                setMessages([]);
+                selectedConvIdRef.current = null;
+            }
+            toast.success("Chat deleted");
+            return true;
+        } catch (error) {
+            console.error("Failed to delete conversation:", error);
+            toast.error(error.response?.data?.error || "Failed to delete chat");
+            return false;
+        }
+    }, []);
+
     // Fetch conversations on mount
     useEffect(() => {
         fetchConversations();
@@ -422,6 +450,48 @@ export const ChatProvider = ({ children }) => {
             } else {
                 if (message.senderId !== user?.id && message.sender?.id !== user?.id) {
                     socket.emit("message:delivered", { messageIds: [message.id], conversationId });
+
+                    // Increment unread count
+                    setUnreadCounts((prev) => ({
+                        ...prev,
+                        [conversationId]: (prev[conversationId] || 0) + 1,
+                    }));
+
+                    // Play notification sound
+                    try {
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                        osc.type = "sine";
+                        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                        osc.start(audioCtx.currentTime);
+                        osc.stop(audioCtx.currentTime + 0.3);
+                    } catch { /* audio not available */ }
+
+                    // WhatsApp-style toast notification
+                    const senderName = message.sender?.displayName || "New message";
+                    const preview = message.content
+                        ? (message.content.length > 60 ? message.content.slice(0, 60) + "…" : message.content)
+                        : (message.fileType === "video" ? "Video" : "Photo");
+
+                    toast.custom((t) => (
+                        <div
+                            className={`flex max-w-sm cursor-pointer items-center gap-3 rounded-2xl border border-border bg-surface-panel px-4 py-3 shadow-elevated transition-all ${t.visible ? "animate-slide-in-right" : "opacity-0"}`}
+                            onClick={() => { toast.dismiss(t.id); selectConversation(conversationId); }}
+                        >
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">
+                                {senderName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="truncate text-sm font-semibold text-content-primary">{senderName}</p>
+                                <p className="truncate text-xs text-content-muted">{preview}</p>
+                            </div>
+                        </div>
+                    ), { duration: 4000, position: "top-right" });
                 }
             }
 
@@ -449,14 +519,14 @@ export const ChatProvider = ({ children }) => {
             }
         };
 
-        // ── Phase 8: Handle edited messages ──────────────
+
         const handleMessageEdited = ({ conversationId, message: updatedMsg }) => {
             if (selectedConvIdRef.current === conversationId) {
                 setMessages((prev) =>
                     prev.map((msg) => (msg.id === updatedMsg.id ? updatedMsg : msg))
                 );
             }
-            // Also update sidebar last message if it was the last one
+
             setConversations((prev) =>
                 prev.map((c) => {
                     if (c.id === conversationId && c.messages?.[0]?.id === updatedMsg.id) {
@@ -467,7 +537,7 @@ export const ChatProvider = ({ children }) => {
             );
         };
 
-        // ── Phase 8: Handle deleted messages ─────────────
+
         const handleMessageDeleted = ({ conversationId, messageId, deletedForAll }) => {
             if (selectedConvIdRef.current === conversationId) {
                 setMessages((prev) =>
@@ -508,7 +578,7 @@ export const ChatProvider = ({ children }) => {
             });
         };
 
-        // ── Group socket events ───────────────────────────
+
         const handleGroupUpdated = ({ conversation }) => {
             setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, ...conversation } : c));
             if (selectedConvIdRef.current === conversation.id) {
@@ -566,6 +636,26 @@ export const ChatProvider = ({ children }) => {
             }
         };
 
+
+        const handleConversationCreated = ({ conversation }) => {
+            setConversations((prev) => {
+                const exists = prev.find((c) => c.id === conversation.id);
+                if (exists) return prev;
+                return [conversation, ...prev];
+            });
+
+        };
+
+
+        const handleConversationDeleted = ({ conversationId }) => {
+            setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+            if (selectedConvIdRef.current === conversationId) {
+                setSelectedConversation(null);
+                setMessages([]);
+                selectedConvIdRef.current = null;
+            }
+        };
+
         socket.on("new:message", handleNewMessage);
         socket.on("message:statusUpdate", handleStatusUpdate);
         socket.on("message:edited", handleMessageEdited);
@@ -577,6 +667,8 @@ export const ChatProvider = ({ children }) => {
         socket.on("group:memberRemoved", handleGroupMemberRemoved);
         socket.on("group:deleted", handleGroupDeleted);
         socket.on("group:roleChanged", handleGroupRoleChanged);
+        socket.on("conversation:created", handleConversationCreated);
+        socket.on("conversation:deleted", handleConversationDeleted);
 
         return () => {
             socket.off("new:message", handleNewMessage);
@@ -590,10 +682,12 @@ export const ChatProvider = ({ children }) => {
             socket.off("group:memberRemoved", handleGroupMemberRemoved);
             socket.off("group:deleted", handleGroupDeleted);
             socket.off("group:roleChanged", handleGroupRoleChanged);
+            socket.off("conversation:created", handleConversationCreated);
+            socket.off("conversation:deleted", handleConversationDeleted);
         };
     }, [socket, user?.id]);
 
-    // Get typing users for the current conversation
+
     const getTypingUsers = useCallback((conversationId) => {
         const typingSet = typingUsers[conversationId];
         if (!typingSet || typingSet.size === 0) return [];
@@ -620,7 +714,8 @@ export const ChatProvider = ({ children }) => {
                 unblockUser,
                 checkBlockStatus,
                 markAsRead,
-                // Group functions
+                unreadCounts,
+
                 createGroup,
                 updateGroup,
                 addMembers,
@@ -630,7 +725,8 @@ export const ChatProvider = ({ children }) => {
                 leaveGroup,
                 deleteGroup,
                 startAIChat,
-                // Phase 8: Edit, Delete, Reply
+                deleteConversation,
+
                 replyingTo,
                 setReplyingTo,
                 cancelReply,
@@ -640,7 +736,7 @@ export const ChatProvider = ({ children }) => {
                 editMessage,
                 deleteMessageForSelf,
                 deleteMessageForEveryone,
-                // Phase 9: Message Search
+
                 jumpToMessageId,
                 setJumpToMessageId,
             }}

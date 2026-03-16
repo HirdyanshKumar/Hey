@@ -8,7 +8,7 @@ router.use(authMiddleware);
 router.post("/bot/conversation", getOrCreateAIBotConversation);
 router.get("/smart-replies/:conversationId", getSmartReplies);
 
-// Phase 14: AI Writing Tools & Translation
+
 router.post("/summarize/:conversationId", summarizeChat);
 router.post("/rephrase", rephrase);
 router.post("/translate", translate);

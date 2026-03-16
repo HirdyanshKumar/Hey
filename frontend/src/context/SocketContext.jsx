@@ -49,12 +49,12 @@ export const SocketProvider = ({ children }) => {
         setSocketInstance(socket);
 
         socket.on("connect", () => {
-            console.log("🔌 Socket connected:", socket.id);
+            console.log("Socket connected:", socket.id);
             setIsConnected(true);
         });
 
         socket.on("disconnect", () => {
-            console.log("🔌 Socket disconnected");
+            console.log("Socket disconnected");
             setIsConnected(false);
         });
 

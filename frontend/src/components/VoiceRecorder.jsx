@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, Square, Trash2, Send } from "lucide-react";
+import { Trash2, Send, Mic } from "lucide-react";
 
 const VoiceRecorder = ({ onSend, onCancel }) => {
     const [isRecording, setIsRecording] = useState(false);
@@ -41,10 +41,9 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
                 }
             };
 
-            mediaRecorder.start(200); // collect chunks every 200ms
+            mediaRecorder.start(200);
             setIsRecording(true);
 
-            // Start timer
             setRecordingTime(0);
             timerRef.current = setInterval(() => {
                 setRecordingTime((prev) => prev + 1);
@@ -52,12 +51,11 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
 
         } catch (error) {
             console.error("Error accessing microphone:", error);
-            onCancel(); // Auto cancel if mic access fails
+            onCancel();
         }
     };
 
     useEffect(() => {
-        // Start recording immediately when mounted
         startRecording();
         return () => {
             stopRecording(false);
@@ -68,30 +66,55 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
-        return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+        return `${mins}:${secs.toString().padStart(2, "0")}`;
     };
 
     return (
-        <div className="flex items-center flex-1 justify-between px-2 w-full animate-fade-in">
-            <div className="flex items-center gap-3">
-                <button
-                    type="button"
-                    onClick={() => { stopRecording(false); onCancel(); }}
-                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-fast"
-                >
-                    <Trash2 size={20} />
-                </button>
-                <div className="flex items-center gap-2 text-red-500 font-mono">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
-                    {formatTime(recordingTime)}
+        <div className="flex flex-1 items-center gap-3 animate-fade-in">
+            {/* Delete / Cancel button */}
+            <button
+                type="button"
+                onClick={() => { stopRecording(false); onCancel(); }}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-status-error transition-colors hover:bg-status-error/15"
+            >
+                <Trash2 size={20} />
+            </button>
+
+            {/* Recording indicator */}
+            <div className="flex flex-1 items-center gap-3 rounded-full bg-surface-elevated px-4 py-2.5">
+                {/* Pulsing red dot */}
+                <div className="relative flex h-3 w-3 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-error opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-status-error" />
                 </div>
+
+                {/* Timer */}
+                <span className="font-mono text-sm font-medium tabular-nums text-content-primary">
+                    {formatTime(recordingTime)}
+                </span>
+
+                {/* Animated waveform bars */}
+                <div className="flex flex-1 items-center justify-center gap-[3px]">
+                    {Array.from({ length: 24 }).map((_, i) => (
+                        <div
+                            key={i}
+                            className="w-[3px] rounded-full bg-accent/60"
+                            style={{
+                                height: `${6 + Math.sin((recordingTime * 3 + i) * 0.7) * 10 + Math.random() * 6}px`,
+                                transition: "height 0.15s ease",
+                            }}
+                        />
+                    ))}
+                </div>
+
+                <Mic size={16} className="shrink-0 text-status-error" />
             </div>
 
+            {/* Send button */}
             <button
                 type="button"
                 onClick={() => { stopRecording(true); }}
-                className="p-2.5 bg-accent text-white rounded-full hover:bg-accent-hover transition-fast shadow-md"
-                style={{ backgroundColor: "var(--accent)" }}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-md transition-colors hover:bg-accent-hover"
             >
                 <Send size={18} />
             </button>

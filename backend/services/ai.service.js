@@ -1,7 +1,6 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const prisma = require("../config/prisma");
 
-// Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const AI_BOT_EMAIL = "ai@hey.app";
@@ -10,7 +9,7 @@ const AI_BOT_NAME = "Hey AI";
 const getAIBotUser = async () => {
     let aiUser = await prisma.user.findUnique({ where: { email: AI_BOT_EMAIL } });
     if (!aiUser) {
-        // Hash password just in case, though it won't login directly
+
         const bcrypt = require("bcryptjs");
         const hashedPassword = await bcrypt.hash(Math.random().toString(36), 10);
         aiUser = await prisma.user.create({
@@ -18,7 +17,7 @@ const getAIBotUser = async () => {
                 email: AI_BOT_EMAIL,
                 password: hashedPassword,
                 displayName: AI_BOT_NAME,
-                avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=HeyAI", // simple bot avatar
+                avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=HeyAI",
                 isOnline: true,
             },
         });
@@ -26,7 +25,7 @@ const getAIBotUser = async () => {
     return aiUser;
 };
 
-// Generate an AI response based on conversation history
+
 const generateAIResponse = async (history, newPrompt) => {
     try {
         const model = genAI.getGenerativeModel({
@@ -34,7 +33,7 @@ const generateAIResponse = async (history, newPrompt) => {
             systemInstruction: "You are 'Hey AI', a friendly, concise, and helpful conversational chat companion. Keep your responses short, natural, and conversational, like you are texting a friend. Avoid long, essay-like explanations, excessive bullet points, or dictionary-style definitions unless explicitly asked. Be warm and human-like. IMPORTANT: You are strictly forbidden from using any markdown formatting like **bold** or *italics* or bullet points or numbered lists. Your entire output must be 100% plain text. Use natural paragraphs and emojis instead."
         });
 
-        // Gemini requires alternating roles starting with 'user'
+
         const formattedHistory = [];
         for (const msg of history) {
             const role = msg.isUser ? "user" : "model";
@@ -45,7 +44,7 @@ const generateAIResponse = async (history, newPrompt) => {
             }
         }
 
-        // Ensure first message is user
+
         if (formattedHistory.length > 0 && formattedHistory[0].role === "model") {
             formattedHistory.shift();
         }
@@ -57,7 +56,7 @@ const generateAIResponse = async (history, newPrompt) => {
         const result = await chatSession.sendMessage(newPrompt);
         let rawText = result.response.text();
 
-        // Vigorously strip out all markdown asterisks and hashtags to ensure plain text
+
         rawText = rawText.replace(/[*#]/g, "");
 
         return rawText;
@@ -82,7 +81,7 @@ ${recentMessages.map(m => `${m.senderName}: ${m.content}`).join("\n")}
         const result = await model.generateContent(prompt);
         let text = result.response.text().trim();
 
-        // Remove markdown formatting if present
+
         if (text.startsWith("\`\`\`json")) {
             text = text.replace(/\`\`\`json/g, "").replace(/\`\`\`/g, "").trim();
         } else if (text.startsWith("\`\`\`")) {
@@ -97,11 +96,9 @@ ${recentMessages.map(m => `${m.senderName}: ${m.content}`).join("\n")}
     }
 };
 
-// ── Phase 14: AI Writing Tools & Translation ──────────────────
 
-/**
- * Summarize a conversation from an array of messages
- */
+
+
 const summarizeConversation = async (messages) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -128,11 +125,7 @@ ${conversation}
     }
 };
 
-/**
- * Rephrase / improve text using different modes
- * @param {string} text - The text to rephrase
- * @param {string} mode - One of: rephrase, grammar, formal, casual, professional
- */
+
 const rephraseText = async (text, mode = "rephrase") => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -157,7 +150,7 @@ Text: "${text}"
         const result = await model.generateContent(prompt);
         let output = result.response.text().trim();
         output = output.replace(/[*#]/g, "");
-        // Remove surrounding quotes if the AI wraps them
+
         if ((output.startsWith('"') && output.endsWith('"')) || (output.startsWith("'") && output.endsWith("'"))) {
             output = output.slice(1, -1);
         }
@@ -168,11 +161,7 @@ Text: "${text}"
     }
 };
 
-/**
- * Translate a message to a target language
- * @param {string} text - The text to translate
- * @param {string} targetLanguage - Language name (e.g. "Spanish", "Hindi", "French")
- */
+
 const translateMessage = async (text, targetLanguage) => {
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });

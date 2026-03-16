@@ -118,9 +118,6 @@ const getSmartReplies = async (req, res) => {
     }
 };
 
-// ── Phase 14: AI Writing Tools & Translation ──────────────────
-
-// POST /api/ai/summarize/:conversationId
 const summarizeChat = async (req, res) => {
     try {
         const { conversationId } = req.params;

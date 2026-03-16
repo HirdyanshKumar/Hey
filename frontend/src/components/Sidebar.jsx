@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import { useChat } from "../context/ChatContext";
-import { Search, Settings, Plus, X, MessageCircle, Users, SearchIcon, Bot } from "lucide-react";
+import { Search, Settings, Plus, X, MessageCircle, Users, SearchIcon, Bot, Trash2 } from "lucide-react";
 import api from "../utils/api";
 import MessageSearchModal from "./MessageSearchModal";
 import toast from "react-hot-toast";
@@ -32,6 +32,8 @@ const Sidebar = () => {
         createConversation,
         createGroup,
         startAIChat,
+        deleteConversation,
+        unreadCounts,
     } = useChat();
     const navigate = useNavigate();
 
@@ -257,11 +259,12 @@ const Sidebar = () => {
                                 {dmConversations.map((conv) => {
                                     const { name, avatar, online, lastMessagePreview, time } = getConversationDisplay(conv);
                                     const isSelected = selectedConversation?.id === conv.id;
+                                    const unread = unreadCounts[conv.id] || 0;
                                     return (
-                                        <button
+                                        <div
                                             key={conv.id}
                                             onClick={() => selectConversation(conv.id)}
-                                            className={`mb-1.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                                            className={`group mb-1.5 flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
                                                 isSelected ? "bg-surface-soft" : "hover:bg-surface-hover"
                                             }`}
                                         >
@@ -273,18 +276,37 @@ const Sidebar = () => {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between">
-                                                    <span className={`truncate text-sm font-semibold ${isSelected ? "text-content-primary" : "text-content-secondary"}`}>
+                                                    <span className={`truncate text-sm font-semibold ${unread > 0 ? "text-content-primary" : isSelected ? "text-content-primary" : "text-content-secondary"}`}>
                                                         {name}
                                                     </span>
-                                                    <span className="ml-2 shrink-0 text-xs text-content-muted">
+                                                    <span className={`ml-2 shrink-0 text-xs ${unread > 0 ? "text-accent font-semibold" : "text-content-muted"}`}>
                                                         {formatTime(time)}
                                                     </span>
                                                 </div>
-                                                <p className="mt-0.5 truncate text-xs text-content-muted">
-                                                    {lastMessagePreview || "No messages yet"}
-                                                </p>
+                                                <div className="mt-0.5 flex items-center justify-between gap-2">
+                                                    <p className={`truncate text-xs ${unread > 0 ? "text-content-primary font-medium" : "text-content-muted"}`}>
+                                                        {lastMessagePreview || "No messages yet"}
+                                                    </p>
+                                                    {unread > 0 && (
+                                                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-white">
+                                                            {unread > 99 ? "99+" : unread}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (window.confirm("Delete this conversation? This cannot be undone.")) {
+                                                        deleteConversation(conv.id);
+                                                    }
+                                                }}
+                                                className="shrink-0 rounded-lg p-1.5 text-content-muted opacity-0 transition-all hover:bg-status-error/20 hover:text-status-error group-hover:opacity-100"
+                                                title="Delete chat"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     );
                                 })}
                             </>
@@ -301,11 +323,12 @@ const Sidebar = () => {
                                 {groupConversations.map((conv) => {
                                     const { name, lastMessagePreview, time } = getConversationDisplay(conv);
                                     const isSelected = selectedConversation?.id === conv.id;
+                                    const unread = unreadCounts[conv.id] || 0;
                                     return (
-                                        <button
+                                        <div
                                             key={conv.id}
                                             onClick={() => selectConversation(conv.id)}
-                                            className={`mb-1.5 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                                            className={`mb-1.5 flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
                                                 isSelected ? "bg-surface-soft" : "hover:bg-surface-hover"
                                             }`}
                                         >
@@ -314,18 +337,25 @@ const Sidebar = () => {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between">
-                                                    <span className={`truncate text-sm font-semibold ${isSelected ? "text-content-primary" : "text-content-secondary"}`}>
+                                                    <span className={`truncate text-sm font-semibold ${unread > 0 ? "text-content-primary" : isSelected ? "text-content-primary" : "text-content-secondary"}`}>
                                                         {name}
                                                     </span>
-                                                    <span className="ml-2 shrink-0 text-xs text-content-muted">
+                                                    <span className={`ml-2 shrink-0 text-xs ${unread > 0 ? "text-accent font-semibold" : "text-content-muted"}`}>
                                                         {formatTime(time)}
                                                     </span>
                                                 </div>
-                                                <p className="mt-0.5 truncate text-xs text-content-muted">
-                                                    {lastMessagePreview || "No messages yet"}
-                                                </p>
+                                                <div className="mt-0.5 flex items-center justify-between gap-2">
+                                                    <p className={`truncate text-xs ${unread > 0 ? "text-content-primary font-medium" : "text-content-muted"}`}>
+                                                        {lastMessagePreview || "No messages yet"}
+                                                    </p>
+                                                    {unread > 0 && (
+                                                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-white">
+                                                            {unread > 99 ? "99+" : unread}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </button>
+                                        </div>
                                     );
                                 })}
                             </>

@@ -4,7 +4,6 @@ const cloudinary = require("../config/cloudinary");
 const EDIT_WINDOW_MS = 15 * 60 * 1000;     // 15 minutes
 const DELETE_WINDOW_MS = 60 * 60 * 1000;   // 1 hour
 
-// ── Shared include for replyTo ────────────────────────
 const replyToInclude = {
     replyTo: {
         select: {
@@ -300,8 +299,16 @@ const uploadMedia = async (req, res) => {
             folder: "chat_app_media",
         });
 
-        // result.resource_type is usually 'image' or 'video'
-        const fileType = result.resource_type === "video" ? "video" : "image";
+        // Cloudinary classifies audio as "video" resource_type.
+        // Check the original MIME type to correctly identify audio files.
+        let fileType;
+        if (req.file.mimetype.startsWith("audio/")) {
+            fileType = "audio";
+        } else if (result.resource_type === "video") {
+            fileType = "video";
+        } else {
+            fileType = "image";
+        }
 
         return res.status(200).json({
             fileUrl: result.secure_url,

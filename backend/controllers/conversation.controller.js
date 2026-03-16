@@ -1,4 +1,5 @@
 const prisma = require("../config/prisma");
+const { onlineUsers } = require("../socket/socket");
 
 // POST /api/conversations — Create a 1-on-1 conversation
 const createConversation = async (req, res) => {
@@ -59,6 +60,31 @@ const createConversation = async (req, res) => {
                 messages: { orderBy: { createdAt: "desc" }, take: 1 },
             },
         });
+
+        // Notify all participants via socket so they auto-join the room
+        const io = req.app.get("io");
+        if (io) {
+            for (const p of conversation.participants) {
+                const sockets = onlineUsers.get(p.user.id);
+                if (sockets) {
+                    for (const sid of sockets) {
+                        const s = io.sockets.sockets.get(sid);
+                        if (s) {
+                            s.join(`conv:${conversation.id}`);
+                        }
+                    }
+                }
+            }
+            // Emit to all participants so their frontends add the conversation to state
+            for (const p of conversation.participants) {
+                const sockets = onlineUsers.get(p.user.id);
+                if (sockets) {
+                    for (const sid of sockets) {
+                        io.to(sid).emit("conversation:created", { conversation });
+                    }
+                }
+            }
+        }
 
         return res.status(201).json({ conversation });
     } catch (error) {
@@ -139,4 +165,48 @@ const getConversationById = async (req, res) => {
     }
 };
 
-module.exports = { createConversation, getConversations, getConversationById };
+// DELETE /api/conversations/:id — Delete a 1-on-1 conversation
+const deleteConversation = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { id } = req.params;
+
+        // Find the conversation and verify the user is a participant
+        const conversation = await prisma.conversation.findFirst({
+            where: {
+                id,
+                participants: { some: { userId } },
+            },
+            include: {
+                participants: { select: { userId: true } },
+            },
+        });
+
+        if (!conversation) {
+            return res.status(404).json({ error: "Conversation not found." });
+        }
+
+        // Only allow deleting 1-on-1 chats (groups have their own delete logic)
+        if (conversation.isGroup) {
+            return res.status(400).json({ error: "Use the group delete endpoint for groups." });
+        }
+
+        // Delete all messages, participants, then the conversation (cascade handles this)
+        await prisma.conversation.delete({
+            where: { id },
+        });
+
+        // Notify participants via socket
+        const io = req.app.get("io");
+        if (io) {
+            io.to(`conv:${id}`).emit("conversation:deleted", { conversationId: id });
+        }
+
+        return res.status(200).json({ message: "Conversation deleted successfully." });
+    } catch (error) {
+        console.error("deleteConversation error:", error);
+        return res.status(500).json({ error: "Failed to delete conversation." });
+    }
+};
+
+module.exports = { createConversation, getConversations, getConversationById, deleteConversation };
